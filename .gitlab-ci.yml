@@ -296,6 +296,9 @@ gather:
 #"Run all L2 tests":
 #    <<: *MANUAL_TEST_TRIGGER
 
+.1GPU: &1GPU
+    tags:
+    - 1GPU
 .P100_1GPU: &P100_1GPU
     tags:
     - P100
@@ -347,6 +350,9 @@ gather:
 ##        TEST_SCRIPT: "./test.sh"
 ##
 ######################################################
+L0_build_cpu:
+    <<: *L0_TEST
+    <<: *1GPU
 
 L0_make_test--P100_1GPU:
     <<: *L0_TEST
