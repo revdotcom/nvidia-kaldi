@@ -416,6 +416,14 @@ L1_multi-cn--V100_1GPU:
     <<: *L1_TEST
     <<: *V100_1GPU
 
+L1_cvte--V100_1GPU:
+    <<: *L1_TEST
+    <<: *V100_1GPU
+
+L1_cvte--T4_1GPU:
+    <<: *L1_TEST
+    <<: *T4_1GPU
+
 IV_en-US--V100_1GPU:
     <<: *IV_TEST
     <<: *V100_1GPU
