@@ -8,7 +8,6 @@ MODEL_PATH=${MODEL_PATH:-"${WORKSPACE}/models/LibriSpeech/"}
 DATASET=${DATASET:-"${WORKSPACE}/datasets/LibriSpeech/test_clean/"}
 
 GPU=${GPU:-0}
-GPU_THREADS=${GPU_THREADS:-2}
 COPY_THREADS=${COPY_THREADS:-0}
 
 BEAM=${BEAM:-10}
@@ -19,18 +18,12 @@ AUX_Q_CAPACITY=${AUX_Q_CAPACITY:-400000}
 
 #query GPU memory
 gpu_memory=`nvidia-smi -q -i $GPU | grep -A1 "FB Memory" | grep Total | tr -s " " | cut -d " " -f 4`
-if [ $gpu_memory -ge 32000 ]; then
+if [ $gpu_memory -ge 16000 ]; then
   MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-600}
-  BATCH_DRAIN_SIZE=${BATCH_DRAIN_SIZE:-80}
-elif [ $gpu_memory -ge 16000 ]; then
-  MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-300}
-  BATCH_DRAIN_SIZE=${BATCH_DRAIN_SIZE:-40}
 elif [ $gpu_memory -ge 8000 ]; then
-  MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-150}
-  BATCH_DRAIN_SIZE=${BATCH_DRAIN_SIZE:-20}
+  MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-200}
 elif [ $gpu_memory -ge 4000 ]; then
   MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-75}
-  BATCH_DRAIN_SIZE=${BATCH_DRAIN_SIZE:-10}
 else
   echo "ERROR not enough GPU memory to run benchmark."
   exit 1;
