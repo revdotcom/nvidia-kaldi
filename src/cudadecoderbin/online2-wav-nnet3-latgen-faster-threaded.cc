@@ -19,7 +19,7 @@
 // limitations under the License.
 
 #include <sstream>
-#include "cudadecoder/thread-pool.h"
+#include "cudadecoder/deprecated/thread-pool.h"
 #include "feat/wave-reader.h"
 #include "fstext/fstext-lib.h"
 #include "lat/lattice-functions.h"
@@ -146,23 +146,30 @@ int main(int argc, char *argv[]) {
     typedef kaldi::int64 int64;
 
     const char *usage =
-        "Reads in wav file(s) and simulates online decoding with neural nets\n"
-        "(nnet3 setup), with optional iVector-based speaker adaptation and\n"
-        "optional endpointing.  Note: some configuration values and inputs "
+        "Reads in wav file(s) and simulates online decoding with "
+        "neural nets\n"
+        "(nnet3 setup), with optional iVector-based speaker "
+        "adaptation and\n"
+        "optional endpointing.  Note: some configuration values "
+        "and inputs "
         "are\n"
-        "set via config files whose filenames are passed as options\n"
+        "set via config files whose filenames are passed as "
+        "options\n"
         "\n"
-        "Usage: online2-wav-nnet3-latgen-faster [options] <nnet3-in> <fst-in> "
-        "<spk2utt-rspecifier> <wav-rspecifier> <lattice-wspecifier>\n"
-        "The spk2utt-rspecifier can just be <utterance-id> <utterance-id> if\n"
+        "Usage: online2-wav-nnet3-latgen-faster [options] "
+        "<nnet3-in> <fst-in> "
+        "<spk2utt-rspecifier> <wav-rspecifier> "
+        "<lattice-wspecifier>\n"
+        "The spk2utt-rspecifier can just be <utterance-id> "
+        "<utterance-id> if\n"
         "you want to decode utterance by utterance.\n";
 
     ParseOptions po(usage);
 
     std::string word_syms_rxfilename;
 
-    // feature_opts includes configuration for the iVector adaptation,
-    // as well as the basic features.
+    // feature_opts includes configuration for the iVector
+    // adaptation, as well as the basic features.
     OnlineNnet2FeaturePipelineConfig feature_opts;
     nnet3::NnetSimpleLoopedComputationOptions decodable_opts;
     LatticeFasterDecoderConfig decoder_opts;
@@ -179,14 +186,17 @@ int main(int argc, char *argv[]) {
     po.Register("iterations", &iterations,
                 "Number of times to decode the corpus.");
     po.Register("file-limit", &num_todo,
-                "Limits the number of files that are processed by this driver. "
-                "After N files are processed the remaining files are ignored. "
+                "Limits the number of files that are processed by "
+                "this driver. "
+                "After N files are processed the remaining files "
+                "are ignored. "
                 "Useful for profiling");
     po.Register("num-threads", &num_threads, "number of threads in workpool.");
     po.Register("word-symbol-table", &word_syms_rxfilename,
                 "Symbol table for words [for debug output]");
     po.Register("num-threads-startup", &g_num_threads,
-                "Number of threads used when initializing iVector extractor.");
+                "Number of threads used when initializing iVector "
+                "extractor.");
 
     feature_opts.Register(&po);
     decodable_opts.Register(&po);
@@ -226,9 +236,10 @@ int main(int argc, char *argv[]) {
       nnet3::CollapseModel(nnet3::CollapseModelConfig(), &(am_nnet.GetNnet()));
     }
 
-    // this object contains precomputed stuff that is used by all decodable
-    // objects.  It takes a pointer to am_nnet because if it has iVectors it has
-    // to modify the nnet to accept iVectors at intervals.
+    // this object contains precomputed stuff that is used by all
+    // decodable objects.  It takes a pointer to am_nnet because if
+    // it has iVectors it has to modify the nnet to accept iVectors
+    // at intervals.
     nnet3::DecodableNnetSimpleLoopedInfo decodable_info(decodable_opts,
                                                         &am_nnet);
 
@@ -258,8 +269,8 @@ int main(int argc, char *argv[]) {
       for (; !wav_reader_new.Done(); wav_reader_new.Next()) {
         std::string utt = wav_reader_new.Key();
 
-        // Deep copy for now,  Dan mentioned we might be able to use Swap
-        // instead.
+        // Deep copy for now,  Dan mentioned we might be
+        // able to use Swap instead.
         WaveData *wave_data = new WaveData(wav_reader_new.Value());
 
         if (iter == 0) {
