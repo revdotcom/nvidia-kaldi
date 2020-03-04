@@ -4,6 +4,7 @@ if [ $PWD -eq "/workspace/nvidia-examples" ]; then
   echo "You must call that benchmark script from a model directory, such as /workspace/nvidia-examples/librispeech"
   exit 1
 fi
+
 trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM
 
 #this is an example script of tha speech to text pipeline.  
@@ -27,6 +28,7 @@ function run_benchmark() {
   if [ $ONLINE -eq 1 ]; then
     stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
+    --num-parallel-streaming-channels=$ONLINE_NUM_PARALLEL_STREAMING_CHANNELS \
     $MODEL_PATH/final.mdl \
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
@@ -191,6 +193,7 @@ echo "WORKSPACE=$WORKSPACE"
 echo "DATASET=$DATASET"
 echo "MODEL_PATH=$MODEL_PATH"
 echo "MODEL_NAME=$MODEL_NAME"
+echo "ONLINE_NUM_PARALLEL_STREAMING_CHANNELS: $ONLINE_NUM_PARALLEL_STREAMING_CHANNELS"
 
 if [ $USE_GPU -eq 1 ]; then
   if [ $ONLINE -eq 1 ]; then
