@@ -1,4 +1,9 @@
 #!/bin/bash
+
+if [ $PWD -eq "/workspace/nvidia-examples" ]; then
+  echo "You must call that benchmark script from a model directory, such as /workspace/nvidia-examples/librispeech"
+  exit 1
+fi
 trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM
 
 #this is an example script of tha speech to text pipeline.  
