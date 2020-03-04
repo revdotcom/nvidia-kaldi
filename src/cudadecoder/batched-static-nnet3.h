@@ -28,7 +28,7 @@
 // latency and increase the arithmetic intensity of the GEMMs
 // not not bigger so that running partial batches is faster
 // (e.g. running a batch size = 72 with max_batch_size_=512)
-#define MAX_COMPUTE_BATCH_SIZE 64
+#define MAX_COMPUTE_BATCH_SIZE 128
 
 #include "cudadecoder/batched-static-nnet3-kernels.h"
 #include "nnet3/am-nnet-simple.h"
