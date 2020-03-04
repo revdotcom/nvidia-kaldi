@@ -19,14 +19,23 @@ function run_benchmark() {
 
   # run the target decoder with the current dataset
   echo "    Running $DECODER on $DATASET.  Output log: $LOG_FILE"
-  stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
+  if [ $ONLINE -eq 1 ]; then
+    stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
+    --config="$MODEL_PATH/conf/online.conf"\
+    $MODEL_PATH/final.mdl \
+    $MODEL_PATH/HCLG.fst \
+    $SPK2UTT \
+    "$WAVIN" \
+    "ark:|gzip -c > $LOCAL_RESULT_PATH/lat.gz"
+  else
+    stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
     $MODEL_PATH/final.mdl \
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
     "$WAVIN" \
     "ark:|gzip -c > $LOCAL_RESULT_PATH/lat.gz" &> $LOG_FILE
-
+  fi
   if [ $? -ne 0 ]; then
     echo "  ERROR encountered while decoding. Check $LOG_FILE"
     exit 1;
@@ -170,6 +179,7 @@ NUM_GPUS=`nvidia-smi -L | wc -l`
 THREADS_PER_PROCESS=`echo $CPU_THREADS/$NUM_PROCESSES | bc`
 
 echo "USE_GPU: $USE_GPU"
+echo "ONLINE: $ONLINE"
 echo "NUM_PROCESSES: $NUM_PROCESSES"
 echo "KALDI_ROOT: $KALDI_ROOT"
 echo "WORKSPACE=$WORKSPACE"
@@ -178,7 +188,15 @@ echo "MODEL_PATH=$MODEL_PATH"
 echo "MODEL_NAME=$MODEL_NAME"
 
 if [ $USE_GPU -eq 1 ]; then
-  DECODER=$GPU_DECODER
+  if [ $ONLINE -eq 1 ]; then
+    DECODER=$GPU_DECODER_ONLINE
+  else
+     if [ $DEPRECATED -eq 1 ]; then
+       DECODER=$GPU_DECODER_OFFLINE_DEPRECATED
+     else
+       DECODER=$GPU_DECODER_OFFLINE
+     fi
+  fi
   CPU_THREADS=$THREADS_PER_PROCESS
   #these are GPU specific parameters
   echo "CPU_THREADS: $CPU_THREADS"
@@ -320,6 +338,11 @@ if [ $FAIL -eq 1 ]; then
   exit 1
 else
   echo "All tests PASSED"
+fi
+
+# Skipping the WER/RTF tests for online
+if [ $ONLINE -eq 1 ]; then
+	exit 0
 fi
 
 TOTAL_WER=0

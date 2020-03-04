@@ -2,10 +2,14 @@
 
 #set global default parameters only if the variable is not already set
 KALDI_ROOT=${KALDI_ROOT:-"/opt/kaldi/"}
-GPU_DECODER=${GPU_DECODER:-"$KALDI_ROOT/src/cudadecoderbin/batched-wav-nnet3-cuda2"}
+GPU_DECODER_OFFLINE=${GPU_DECODER_OFFLINE:-"$KALDI_ROOT/src/cudadecoderbin/batched-wav-nnet3-cuda2"}
+GPU_DECODER_OFFLINE_DEPRECATED=${GPU_DECODER_OFFLINE_DEPRECATED:-"$KALDI_ROOT/src/cudadecoderbin/batched-wav-nnet3-cuda"}
+GPU_DECODER_ONLINE=${GPU_DECODER_ONLINE:-"$KALDI_ROOT/src/cudadecoderbin/batched-wav-nnet3-cuda-online"}
 CPU_DECODER=${CPU_DECODER:-"$KALDI_ROOT/src/cudadecoderbin/online2-wav-nnet3-latgen-faster-threaded"}
 USE_GPU=${USE_GPU:-1}
 GPU=${GPU:-0}
+ONLINE=${ONLINE:-0}
+DEPRECATED=${DEPRECATED:-0}
 CPU_THREADS=${CPU_THREADS:-`cat /proc/cpuinfo | awk '/^processor/{print $3}' | wc -l`}
 WORKER_THREADS=${WORKER_THREADS:-$(($CPU_THREADS))}
 ITERATIONS=${ITERATIONS:-10}
@@ -19,7 +23,7 @@ AUX_Q_CAPACITY=${AUX_Q_CAPACITY:-500000}
 COMPUTE_CER=${COMPUTE_CER:-false}
 FRAME_SUBSAMPLING_FACTOR=${FRAME_SUBSAMPLING_FACTOR:-3}
 COPY_THREADS=${COPY_THREADS:-4}
-FRAMES_PER_CHUNK=${FRAMES_PER_CHUNK:-51}
+FRAMES_PER_CHUNK=${FRAMES_PER_CHUNK:-102}
 SEGMENT_SIZE=${SEGMENT_SIZE:-30}
 OUTPUT_PATH=${OUTPUT_PATH:-"/tmp/results/$MODEL_NAME"}
 
