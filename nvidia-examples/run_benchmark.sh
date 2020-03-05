@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $PWD -eq "/workspace/nvidia-examples" ]; then
+if [ "$PWD" == "/workspace/nvidia-examples" ]; then
   echo "You must call that benchmark script from a model directory, such as /workspace/nvidia-examples/librispeech"
   exit 1
 fi
@@ -195,9 +195,11 @@ echo "MODEL_PATH=$MODEL_PATH"
 echo "MODEL_NAME=$MODEL_NAME"
 echo "ONLINE_NUM_PARALLEL_STREAMING_CHANNELS: $ONLINE_NUM_PARALLEL_STREAMING_CHANNELS"
 
+FRAMES_PER_CHUNK=$FRAMES_PER_CHUNK_OFFLINE
 if [ $USE_GPU -eq 1 ]; then
   if [ $ONLINE -eq 1 ]; then
     DECODER=$GPU_DECODER_ONLINE
+    FRAMES_PER_CHUNK=$FRAMES_PER_CHUNK_ONLINE
   else
      if [ $DEPRECATED -eq 1 ]; then
        DECODER=$GPU_DECODER_OFFLINE_DEPRECATED
@@ -206,6 +208,7 @@ if [ $USE_GPU -eq 1 ]; then
      fi
   fi
   CPU_THREADS=$THREADS_PER_PROCESS
+  echo "FRAMES_PER_CHUNK:$FRAMES_PER_CHUNK"
   #these are GPU specific parameters
   echo "CPU_THREADS: $CPU_THREADS"
   echo "COPY_THREADS: $COPY_THREADS"
