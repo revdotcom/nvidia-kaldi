@@ -33,7 +33,7 @@ function run_benchmark() {
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
     "$WAVIN" \
-    "ark:|gzip -c > $LOCAL_RESULT_PATH/lat.gz"
+    "ark:|gzip -c > $LOCAL_RESULT_PATH/lat.gz" 2>&1 | tee $LOG_FILE
   else
     stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
@@ -193,7 +193,9 @@ echo "WORKSPACE=$WORKSPACE"
 echo "DATASET=$DATASET"
 echo "MODEL_PATH=$MODEL_PATH"
 echo "MODEL_NAME=$MODEL_NAME"
-echo "ONLINE_NUM_PARALLEL_STREAMING_CHANNELS: $ONLINE_NUM_PARALLEL_STREAMING_CHANNELS"
+if [ $ONLINE -eq 1 ]; then
+  echo "ONLINE_NUM_PARALLEL_STREAMING_CHANNELS: $ONLINE_NUM_PARALLEL_STREAMING_CHANNELS"
+fi
 
 FRAMES_PER_CHUNK=$FRAMES_PER_CHUNK_OFFLINE
 if [ $USE_GPU -eq 1 ]; then
