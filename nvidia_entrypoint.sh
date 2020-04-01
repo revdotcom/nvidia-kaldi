@@ -9,7 +9,7 @@ cat <<EOF
 NVIDIA Release ${NVIDIA_KALDI_VERSION} (build ${NVIDIA_BUILD_ID})
 Kaldi Version ${KALDI_VERSION}
 
-Container image Copyright (c) 2019, NVIDIA CORPORATION.  All rights reserved.
+Container image Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 Copyright 2015-2019, Kaldi contributors.  All rights reserved.
 
 Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
