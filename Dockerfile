@@ -1,4 +1,4 @@
-ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:10.2-devel-ubuntu18.04--master
+ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:11.0-devel-ubuntu18.04--master
 FROM ${FROM_IMAGE_NAME}
 
 ARG KALDI_VERSION
@@ -50,7 +50,7 @@ RUN ln -sf /usr/include/x86_64-linux-gnu/atlas     /usr/local/include/atlas     
 
 RUN cd src/ \
  && ./configure --shared --use-cuda --cudatk-dir=/usr/local/cuda/ --mathlib=ATLAS --atlas-root=/usr/local \
-    --cuda-arch="-gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75" \
+    --cuda-arch="-gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80" \
  && make -j"$(nproc)" depend \
  && make -j"$(nproc)" \
  && make -j"$(nproc)" ext \
