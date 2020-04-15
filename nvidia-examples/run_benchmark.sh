@@ -1,4 +1,10 @@
 #!/bin/bash
+
+if [ "$PWD" == "/workspace/nvidia-examples" ]; then
+  echo "You must call that benchmark script from a model directory, such as /workspace/nvidia-examples/librispeech"
+  exit 1
+fi
+
 trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM
 
 #this is an example script of tha speech to text pipeline.  
@@ -19,14 +25,24 @@ function run_benchmark() {
 
   # run the target decoder with the current dataset
   echo "    Running $DECODER on $DATASET.  Output log: $LOG_FILE"
-  stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
+  if [ $ONLINE -eq 1 ]; then
+    stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
+    --config="$MODEL_PATH/conf/online.conf"\
+    --num-parallel-streaming-channels=$ONLINE_NUM_PARALLEL_STREAMING_CHANNELS \
+    $MODEL_PATH/final.mdl \
+    $MODEL_PATH/HCLG.fst \
+    $SPK2UTT \
+    "$WAVIN" \
+    "ark:|gzip -c > $LOCAL_RESULT_PATH/lat.gz" 2>&1 | tee $LOG_FILE
+  else
+    stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
     $MODEL_PATH/final.mdl \
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
     "$WAVIN" \
     "ark:|gzip -c > $LOCAL_RESULT_PATH/lat.gz" &> $LOG_FILE
-
+  fi
   if [ $? -ne 0 ]; then
     echo "  ERROR encountered while decoding. Check $LOG_FILE"
     exit 1;
@@ -170,24 +186,36 @@ NUM_GPUS=`nvidia-smi -L | wc -l`
 THREADS_PER_PROCESS=`echo $CPU_THREADS/$NUM_PROCESSES | bc`
 
 echo "USE_GPU: $USE_GPU"
+echo "ONLINE: $ONLINE"
 echo "NUM_PROCESSES: $NUM_PROCESSES"
 echo "KALDI_ROOT: $KALDI_ROOT"
 echo "WORKSPACE=$WORKSPACE"
 echo "DATASET=$DATASET"
 echo "MODEL_PATH=$MODEL_PATH"
 echo "MODEL_NAME=$MODEL_NAME"
+if [ $ONLINE -eq 1 ]; then
+  echo "ONLINE_NUM_PARALLEL_STREAMING_CHANNELS: $ONLINE_NUM_PARALLEL_STREAMING_CHANNELS"
+fi
 
+FRAMES_PER_CHUNK=$FRAMES_PER_CHUNK_OFFLINE
 if [ $USE_GPU -eq 1 ]; then
-  DECODER=$GPU_DECODER
+  if [ $ONLINE -eq 1 ]; then
+    DECODER=$GPU_DECODER_ONLINE
+    FRAMES_PER_CHUNK=$FRAMES_PER_CHUNK_ONLINE
+  else
+     if [ $DEPRECATED -eq 1 ]; then
+       DECODER=$GPU_DECODER_OFFLINE_DEPRECATED
+     else
+       DECODER=$GPU_DECODER_OFFLINE
+     fi
+  fi
   CPU_THREADS=$THREADS_PER_PROCESS
+  echo "FRAMES_PER_CHUNK:$FRAMES_PER_CHUNK"
   #these are GPU specific parameters
-  echo "GPU_FEATURE: $GPU_FEATURE"
   echo "CPU_THREADS: $CPU_THREADS"
-  echo "GPU_THREADS: $GPU_THREADS"
   echo "COPY_THREADS: $COPY_THREADS"
   echo "WORKER_THREADS: $WORKER_THREADS"
   echo "MAX_BATCH_SIZE: $MAX_BATCH_SIZE"
-  echo "BATCH_DRAIN_SIZE: $BATCH_DRAIN_SIZE"
   echo "FILE_LIMIT: $FILE_LIMIT"
   echo "MAIN_Q_CAPACITY=$MAIN_Q_CAPACITY"
   echo "AUX_Q_CAPACITY=$AUX_Q_CAPACITY"
@@ -285,7 +313,7 @@ CPUFLAGS=""
 if [ $USE_GPU -eq 1 ]; then
   NUM_CHANNELS=$(($MAX_BATCH_SIZE + $MAX_BATCH_SIZE/2))
   #Set CUDA decoder specific flags
-  CUDAFLAGS="--gpu-feature-extract=$GPU_FEATURE --num-channels=$NUM_CHANNELS --cuda-use-tensor-cores=true --main-q-capacity=$MAIN_Q_CAPACITY --aux-q-capacity=$AUX_Q_CAPACITY --cuda-memory-proportion=.5 --max-batch-size=$MAX_BATCH_SIZE --cuda-control-threads=$GPU_THREADS --batch-drain-size=$BATCH_DRAIN_SIZE --cuda-worker-threads=$WORKER_THREADS  --cuda-decoder-copy-threads=$COPY_THREADS"
+  CUDAFLAGS="--num-channels=$NUM_CHANNELS --cuda-use-tensor-cores=true --main-q-capacity=$MAIN_Q_CAPACITY --aux-q-capacity=$AUX_Q_CAPACITY --cuda-memory-proportion=.5 --max-batch-size=$MAX_BATCH_SIZE --cuda-worker-threads=$WORKER_THREADS  --file-limit=$FILE_LIMIT --cuda-decoder-copy-threads=$COPY_THREADS"
   SPK2UTT=""
 else
   SPK2UTT=ark:$RESULT_PATH/spk2utt.ark
@@ -325,6 +353,11 @@ else
   echo "All tests PASSED"
 fi
 
+# Skipping the WER/RTF tests for online
+if [ $ONLINE -eq 1 ]; then
+	exit 0
+fi
+
 TOTAL_WER=0
 TOTAL_RTF=0
 for (( d = 0 ; d < $NUM_PROCESSES ; d++ )); do
@@ -333,11 +366,8 @@ for (( d = 0 ; d < $NUM_PROCESSES ; d++ )); do
   cat $LOCAL_RESULT_PATH/rtf
   cat $LOCAL_RESULT_PATH/wer
 
-  if [ $USE_GPU -eq 1 ]; then
-    RTF=`cat $LOCAL_RESULT_PATH/rtf | grep Aggregate | tail -n 1 | tr -s " " | cut -d " " -f 10`
-  else
-    RTF=`cat $LOCAL_RESULT_PATH/rtf | grep Aggregate | tail -n 1 | tr -s " " | cut -d " " -f 11`
-  fi
+  RTF=`cat $LOCAL_RESULT_PATH/rtf | grep Aggregate | tail -n 1 | tr -s " " | cut -d " " -f 11`
+  WER=`cat $LOCAL_RESULT_PATH/wer  | grep WER | cut -d " " -f 4`
   TOTAL_RTF=`echo "$RTF + ${TOTAL_RTF}" | bc`
   
   if [ -f  $DATASET/text ]; then
