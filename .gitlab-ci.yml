@@ -596,7 +596,7 @@ L1_contamer:
     - cd "${CONTAMERDIR}"
     - pip3 install -r requirements.txt
     - docker pull "${BASE_IMAGE_NAME_VERSIONED}"
-    - python3 contamer.py -ls "${BASE_IMAGE_NAME_VERSIONED}"
+    - python3 contamer.py --fail-on-non-os -ls "${BASE_IMAGE_NAME_VERSIONED}"
     only:
     - /^.*-devel$/
     - /^master$/
