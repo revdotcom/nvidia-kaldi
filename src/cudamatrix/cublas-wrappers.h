@@ -204,6 +204,7 @@ inline cublasStatus_t cublas_spr(cublasHandle_t handle, cublasFillMode_t uplo,
 //
 // cuSPARSE wrappers
 //
+#if CUDA_VERSION >= 10020
 inline cusparseStatus_t cusparse_csr2csc(cusparseHandle_t handle, int m, int n,
                                          int nnz, const void *csrVal,
                                          const int *csrRowPtr,
@@ -229,38 +230,6 @@ inline cusparseStatus_t cusparse_csr2csc(cusparseHandle_t handle, int m, int n,
   return status;
 }
 
-inline cusparseStatus_t cusparse_csr2csc(cusparseHandle_t handle, int m, int n,
-                                         int nnz, const float *csrVal,
-                                         const int *csrRowPtr,
-                                         const int *csrColInd, float *cscVal,
-                                         int *cscRowInd, int *cscColPtr,
-                                         cusparseAction_t copyValues,
-                                         cusparseIndexBase_t idxBase) {
-#if CUDA_VERSION >= 10010
-  return cusparse_csr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
-                          cscVal, cscRowInd, cscColPtr, CUDA_R_32F, copyValues,
-			  idxBase);
-#else
-  return cusparseScsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
-                          cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
-#endif
-}
-inline cusparseStatus_t cusparse_csr2csc(cusparseHandle_t handle, int m, int n,
-                                         int nnz, const double *csrVal,
-                                         const int *csrRowPtr,
-                                         const int *csrColInd, double *cscVal,
-                                         int *cscRowInd, int *cscColPtr,
-                                         cusparseAction_t copyValues,
-                                         cusparseIndexBase_t idxBase) {
-#if CUDA_VERSION >= 10010
-  return cusparse_csr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
-                          cscVal, cscRowInd, cscColPtr, CUDA_R_64F, copyValues,
-                          idxBase);
-#else
-  return cusparseDcsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
-                          cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
-#endif
-}
 inline cusparseStatus_t cusparse_csrmm2(cusparseHandle_t handle,
                                        cusparseOperation_t transA, 
 				       cusparseOperation_t transB, int m, int n,
@@ -316,6 +285,41 @@ inline cusparseStatus_t cusparse_csrmm2(cusparseHandle_t handle,
 
   return status;
 }
+#endif
+
+inline cusparseStatus_t cusparse_csr2csc(cusparseHandle_t handle, int m, int n,
+                                         int nnz, const float *csrVal,
+                                         const int *csrRowPtr,
+                                         const int *csrColInd, float *cscVal,
+                                         int *cscRowInd, int *cscColPtr,
+                                         cusparseAction_t copyValues,
+                                         cusparseIndexBase_t idxBase) {
+#if CUDA_VERSION >= 10020
+  return cusparse_csr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
+                          cscVal, cscRowInd, cscColPtr, CUDA_R_32F, copyValues,
+			  idxBase);
+#else
+  return cusparseScsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
+                          cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
+#endif
+}
+
+inline cusparseStatus_t cusparse_csr2csc(cusparseHandle_t handle, int m, int n,
+                                         int nnz, const double *csrVal,
+                                         const int *csrRowPtr,
+                                         const int *csrColInd, double *cscVal,
+                                         int *cscRowInd, int *cscColPtr,
+                                         cusparseAction_t copyValues,
+                                         cusparseIndexBase_t idxBase) {
+#if CUDA_VERSION >= 10020
+  return cusparse_csr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
+                          cscVal, cscRowInd, cscColPtr, CUDA_R_64F, copyValues,
+                          idxBase);
+#else
+  return cusparseDcsr2csc(handle, m, n, nnz, csrVal, csrRowPtr, csrColInd,
+                          cscVal, cscRowInd, cscColPtr, copyValues, idxBase);
+#endif
+}
 
 inline cusparseStatus_t cusparse_csrmm2(cusparseHandle_t handle,
                                         cusparseOperation_t transA,
@@ -328,7 +332,7 @@ inline cusparseStatus_t cusparse_csrmm2(cusparseHandle_t handle,
                                         const int *csrColIndA, const float *B,
                                         int ldb, const float *beta, float *C,
                                         int ldc) {
-#if CUDA_VERSION >= 10010
+#if CUDA_VERSION >= 10020
   return cusparse_csrmm2(handle, transA, transB, m, n, k, nnz, alpha, descrA,
                         csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc,
                         CUDA_R_32F); // overloaded with valtype (CUDA_R_32F)
@@ -348,7 +352,7 @@ inline cusparseStatus_t cusparse_csrmm2(cusparseHandle_t handle,
                                         const int *csrColIndA, const double *B,
                                         int ldb, const double *beta, double *C,
                                         int ldc) {
-#if CUDA_VERSION >= 10010
+#if CUDA_VERSION >= 10020
   return cusparse_csrmm2(handle, transA, transB, m, n, k, nnz, alpha, descrA,
                         csrValA, csrRowPtrA, csrColIndA, B, ldb, beta, C, ldc,
                         CUDA_R_64F); // overloaded with valtype (CUDA_R_64F)
@@ -359,7 +363,7 @@ inline cusparseStatus_t cusparse_csrmm2(cusparseHandle_t handle,
 }
 
 
-#endif
+#endif // HAVE_CUDA
 }
 // namespace kaldi
 
