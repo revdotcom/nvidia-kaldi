@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 CXX=${CXX:-g++}
+CXXFLAGS=${CXXFLAGS}
 status=0
 
 # at some point we could try to add packages for Cywgin or macports(?) to this
@@ -25,12 +26,12 @@ case $compiler_ver_info in
     add_packages gcc-c++ g++
     status=1
     ;;
-  "g++ "* )
+  *"c++ "* | "g++ "* )
     gcc_ver=$($CXX -dumpversion)
     gcc_ver_num=$(echo $gcc_ver | sed 's/\./ /g' | xargs printf "%d%02d%02d")
     if [ $gcc_ver_num -lt 40803 ]; then
         echo "$0: Compiler '$CXX' (g++-$gcc_ver) is not supported."
-        echo "$0: You need g++ >= 4.8.3, Apple clang >= 5.0 or LLVM clang >= 3.3."
+        echo "$0: You need g++ >= 4.9.1, Apple clang >= 5.0 or LLVM clang >= 3.3."
         status=1
     fi
     ;;
@@ -59,17 +60,22 @@ case $compiler_ver_info in
 esac
 
 # Cannot check this without a compiler.
-if have "$CXX" && ! echo "#include <zlib.h>" | $CXX -E - >&/dev/null; then
+if have "$CXX" && ! echo "#include <zlib.h>" | $CXX $CXXFLAGS -E - &>/dev/null; then
   echo "$0: zlib is not installed."
   add_packages zlib-devel zlib1g-dev
 fi
 
-for f in make automake autoconf patch grep bzip2 gzip unzip wget git sox gfortran; do
+for f in make automake autoconf patch grep bzip2 gzip unzip wget git sox; do
   if ! have $f; then
     echo "$0: $f is not installed."
     add_packages $f
   fi
 done
+
+if ! have gfortran; then
+  echo "$0: gfortran is not installed"
+  add_packages gcc-gfortran gfortran
+fi
 
 if ! have libtoolize && ! have glibtoolize; then
   echo "$0: neither libtoolize nor glibtoolize is installed"
@@ -87,39 +93,42 @@ if ! have awk; then
 fi
 
 #pythonok=true
-#if ! which python2.7 >&/dev/null; then
+#if ! have python2.7; then
 #  echo "$0: python2.7 is not installed"
-#  add_packages python2.7 python2.7
+#  add_packages python27 python2.7
 #  pythonok=false
 #fi
 #
-#if ! which python3 >&/dev/null; then
+#if ! have python3; then
 #  echo "$0: python3 is not installed"
-#  add_packages python3 python3
+#  add_packages python3
 #  pythonok=false
 #fi
-
+#
 #(
 ##Use a subshell so that sourcing env.sh does not have an influence on the rest of the script
 #[ -f ./env.sh ] && . ./env.sh
-#if $pythonok && ! which python2 >&/dev/null; then
+#if $pythonok && ! have python2; then
 #  mkdir -p $PWD/python
-#  echo "$0: python2.7 is installed, but the python2 binary does not exist. Creating a symlink and adding this to tools/env.sh"
-#  ln -s $(which python2.7) $PWD/python/python2
+#  echo "$0: python2.7 is installed, but the python2 binary does not exist." \
+#       "Creating a symlink and adding this to tools/env.sh"
+#  ln -s $(command -v python2.7) $PWD/python/python2
 #  echo "export PATH=$PWD/python:\${PATH}" >> env.sh
-##fi
+#fi
 #
 #if [[ -f $PWD/python/.use_default_python && -f $PWD/python/python ]]; then
 #  rm $PWD/python/python
 #fi
 #
-#if $pythonok && which python >&/dev/null && [[ ! -f $PWD/python/.use_default_python ]]; then
-#  version=`python 2>&1 --version | awk '{print $2}' `
+#if $pythonok && have python && [[ ! -f $PWD/python/.use_default_python ]]; then
+#  version=$(python 2>&1 --version | awk '{print $2}')
 #  if [[ $version != "2.7"* ]] ; then
-#    echo "$0: WARNING python 2.7 is not the default python. We fixed this by adding a correct symlink more prominently on the path."
-#    echo "$0: If you really want to use python $version as default, add an empty file $PWD/python/.use_default_python and run this script again."
+#    echo "$0: WARNING python 2.7 is not the default python. We fixed this by" \
+#         "adding a correct symlink more prominently on the path."
+#    echo " ... If you really want to use python $version as default, add an" \
+#         "empty file $PWD/python/.use_default_python and run this script again."
 #    mkdir -p $PWD/python
-#    ln -s $(which python2.7) $PWD/python/python
+#    ln -s $(command -v python2.7) $PWD/python/python
 #    echo "export PATH=$PWD/python:\${PATH}" >> env.sh
 #  fi
 #fi
@@ -133,7 +142,7 @@ case $(uname -m) in
     # installed in an alternative location (this is unlikely).
     MKL_ROOT="${MKL_ROOT:-/opt/intel/mkl}"
     if [ ! -f "${MKL_ROOT}/include/mkl.h" ] &&
-         ! echo '#include <mkl.h>' | $CXX -I /opt/intel/mkl/include -E - >&/dev/null; then
+         ! echo '#include <mkl.h>' | $CXX -I /opt/intel/mkl/include -E - &>/dev/null; then
       if [[ $(uname) == Linux ]]; then
         echo "$0: Intel MKL is not installed. Run extras/install_mkl.sh to install it."
       else
@@ -146,7 +155,7 @@ case $(uname -m) in
   *)  # Suggest OpenBLAS on other hardware.
     if [ ! -f $(pwd)/OpenBLAS/install/include/openblas_config.h ] &&
          ! echo '#include <openblas_config.h>' |
-            $CXX -I $(pwd)/OpenBLAS/install/include -E - >&/dev/null; then
+            $CXX -I $(pwd)/OpenBLAS/install/include -E - &>/dev/null; then
       echo "$0: OpenBLAS not detected. Run extras/install_openblas.sh
  ... to compile it for your platform, or configure with --openblas-root= if you
  ... have it installed in a location we could not guess. Note that packaged
