@@ -91,7 +91,8 @@ py3-base:
       GIT_SUBMODULE_STRATEGY: recursive
       GET_SOURCES_ATTEMPTS: 3
     script:
-    - echo -e "FROM ${CI_REGISTRY}/dl/devops/build-scripts:latest AS build-scripts\n"
+    - export FROM_SCRIPTS_IMAGE="${FROM_SCRIPTS_IMAGE:-${CI_REGISTRY}/dl/devops/build-scripts:latest}"
+    - echo -e "FROM ${FROM_SCRIPTS_IMAGE} AS build-scripts\n"
               "FROM ${BASE_IMAGE_NAME_VERSIONED}\n"
               "COPY Dockerfile* /opt/${CI_PROJECT_NAME}/\n"
               "COPY .gitignore /opt/${CI_PROJECT_NAME}/\n"
