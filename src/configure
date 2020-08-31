@@ -292,7 +292,11 @@ configure_mkl_libraries() {
   for file in $mkl_libs; do
     local libfile=$mkllibdir/lib$file.$suffix
     check_exists $libfile
-    linkline+=" -l$file"
+    if ! $static; then
+      linkline+=" -l$file"
+    else
+      linkline+=" $libfile"
+    fi
   done
   linkline+=$link_post
 
@@ -335,16 +339,20 @@ Either your CUDA is too new or too old."
       GCC_VER=$($COMPILER -dumpversion)
       GCC_VER_NUM=$(echo $GCC_VER | sed 's/\./ /g' | xargs printf "%d%02d%02d")
       case $CUDA_VERSION in
-        7_*)
-          MIN_UNSUPPORTED_GCC_VER="5.0"
-          MIN_UNSUPPORTED_GCC_VER_NUM=50000;
-          CUSOLVER=false
-        ;;
-        8_*)
-          MIN_UNSUPPORTED_GCC_VER="6.0"
-          MIN_UNSUPPORTED_GCC_VER_NUM=60000;
-          CUSOLVER=false
-        ;;
+        # Disabling CUDA 7 and CUDA 8 because we now use C++14 to compile CUDA code
+        # It is still possible to use those cuda versions by switching back to C++11
+        # in src/makefiles/cuda_64bit.mk and use CUB <= 1.8.0 (see tools/)
+        # https://github.com/kaldi-asr/kaldi/pull/4242
+        #7_*)
+        #  MIN_UNSUPPORTED_GCC_VER="5.0"
+        #  MIN_UNSUPPORTED_GCC_VER_NUM=50000;
+        #  CUSOLVER=false
+        #;;
+        #8_*)
+        #  MIN_UNSUPPORTED_GCC_VER="6.0"
+        #  MIN_UNSUPPORTED_GCC_VER_NUM=60000;
+        #  CUSOLVER=false
+        #;;
         9_0)
           MIN_UNSUPPORTED_GCC_VER="7.0"
           MIN_UNSUPPORTED_GCC_VER_NUM=70000;
@@ -360,14 +368,9 @@ Either your CUDA is too new or too old."
           MIN_UNSUPPORTED_GCC_VER_NUM=80000;
           CUSOLVER=true
         ;;
-        10_1 | 10_*)
+        10_1 | 10_* | 11_*)
           MIN_UNSUPPORTED_GCC_VER="9.0"
           MIN_UNSUPPORTED_GCC_VER_NUM=90000;
-          CUSOLVER=true
-        ;;
-        11_*)
-          MIN_UNSUPPORTED_GCC_VER="10.0"
-          MIN_UNSUPPORTED_GCC_VER_NUM=100000;
           CUSOLVER=true
         ;;
         *)
@@ -384,21 +387,21 @@ Either your CUDA is too new or too old."
       case `uname -m` in
         x86_64|ppc64le)
           case $CUDA_VERSION in
-            5_5) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35" ;;
-            6_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50" ;;
-            7_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52" ;;
-            8_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61" ;;
+            # Disabling CUDA 7 and 8. See a few lines above for details.		   
+            #7_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52" ;;
+            #8_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61" ;;
             9_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70" ;;
             10_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75" ;;
-            11_*) CUDA_ARCH="-gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80" ;;
+            11_*) CUDA_ARCH="-gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80" ;;
             *) echo "Unsupported CUDA_VERSION (CUDA_VERSION=$CUDA_VERSION), please report it to Kaldi mailing list, together with 'nvcc -h' or 'ptxas -h' which lists allowed -gencode values..."; exit 1 ;;
           esac
         ;;
         aarch64)
           case $CUDA_VERSION in
-            7_*)     CUDA_ARCH="-gencode arch=compute_53,code=sm_53" ;;
-            8_*|9_*) CUDA_ARCH="-gencode arch=compute_53,code=sm_53 -gencode arch=compute_62,code=sm_62" ;;
-            10_*)    CUDA_ARCH="-gencode arch=compute_53,code=sm_53 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_72,code=sm_72" ;;
+            #7_*) CUDA_ARCH="-gencode arch=compute_53,code=sm_53" ;;
+            #8_*) CUDA_ARCH="-gencode arch=compute_53,code=sm_53 -gencode arch=compute_62,code=sm_62" ;;
+            9_*) CUDA_ARCH="-gencode arch=compute_53,code=sm_53 -gencode arch=compute_62,code=sm_62" ;;
+            10_*|11_*) CUDA_ARCH="-gencode arch=compute_53,code=sm_53 -gencode arch=compute_62,code=sm_62 -gencode arch=compute_72,code=sm_72" ;;
             *) echo "Unsupported CUDA_VERSION (CUDA_VERSION=$CUDA_VERSION), please report it to Kaldi mailing list, together with 'nvcc -h' or 'ptxas -h' which lists allowed -gencode values..."; exit 1 ;;
           esac
         ;;
@@ -550,7 +553,7 @@ function linux_configure_atlas_generic {
   fi
   libdir=$(dirname $(echo $ATLASLIBS | awk '{print $1}'))
   [ -z "$libdir" ] && echo "Error getting libdir in linux_configure_atlas_generic: dir=$dir,suffix=$suffix" && exit 1;
-  echo ATLASINC = $ATLASROOT/include/atlas >> kaldi.mk
+  echo ATLASINC = $ATLASROOT/include >> kaldi.mk
   echo ATLASLIBS = $ATLASLIBS -Wl,-rpath=$libdir >> kaldi.mk
   echo >> kaldi.mk
   echo "Successfully configured ATLAS with ATLASLIBS=$ATLASLIBS"
@@ -613,95 +616,10 @@ function linux_configure_atlas_static {
     ATLASLIBS="$ATLASLIBS $ATLASLIBDIR/$x"
   done
 
-  echo ATLASINC = $ATLASROOT/include/atlas >> kaldi.mk
+  echo ATLASINC = $ATLASROOT/include >> kaldi.mk
   echo ATLASLIBS = $ATLASLIBS >> kaldi.mk
   echo >> kaldi.mk
   echo "Successfully configured for Linux [static libraries] with ATLASLIBS =$ATLASLIBS"
-}
-
-function linux_check_dynamic {
-  # will exit with success if $dir seems to contain ATLAS libraries with
-  # right architecture (compatible with default "nm")
-  if $threaded_atlas; then pt=t; else pt=s; fi
-  for atlas_libname in libatlas.so lib${pt}atlas.so; do
-    if [ -f $dir/$atlas_libname ]; then # candidate...
-      if nm --dynamic $dir/$atlas_libname 2>&1 | grep "File format not recognized" >/dev/null; then
-        echo "Directory $dir may contain dynamic ATLAS libraries but seems to be wrong architecture";
-        return 1;
-      fi
-        echo "Atlas found in $dir";
-        return 0;
-      fi
-  done
-  # echo "... no {libatlas,lib${pt}atlas}.so in $dir";
-  return 1;
-}
-
-function linux_configure_dynamic {
-  if $threaded_atlas; then pt=t; else pt=s; fi # relevant to "fat" libraries, will change later for separate ones
-  if [ -z $ATLASLIBDIR ]; then # Note: it'll pick up the last one below.
-    for dir in /usr{,/local}/lib{,64}{,/atlas,/atlas-sse2,/atlas-sse3,/x86_64-linux-gnu} \
-      `pwd`/../tools/ATLAS/build/install/lib/ $ATLASROOT/lib/atlas; do
-      linux_check_dynamic && ATLASLIBDIR=$dir && ATLASLIBNAME=$atlas_libname
-    done
-    if [ -z $ATLASLIBDIR -o -z $ATLASLIBNAME ]; then
-      echo "Could not find {libatlas,lib${pt}atlas}.so in any of the obvious places, will most likely try static:"
-      return 1;
-    fi
-  fi
-
-  # If using "fat" libraries we only need one file to link against
-  if [ $ATLASLIBNAME != libatlas.so ]; then
-    if [ -f $ATLASLIBDIR/$ATLASLIBNAME ]; then
-      ATLASLIBS="$ATLASLIBDIR/$ATLASLIBNAME"
-    else
-      echo "Configuring dynamic ATLAS library failed: library $ATLASLIBNAME not found in $ATLASLIBDIR"
-      return 1;
-    fi
-  else  # with "thin" libraries, we have several object to link against, and different single/multi-thread names
-    if $threaded_atlas; then pt=pt; else pt=""; fi
-    echo "Validating presence of ATLAS libs in $ATLASLIBDIR"
-    ATLASLIBS=
-    # The Lapack part of ATLAS seems to appear under various different names.. but it
-    # should always have symbols like clapack_cgetrf and ATL_cgetrf defined, so we test for this.
-    for libname in lapack lapack_atlas  clapack; do
-      if [ -f $ATLASLIBDIR/lib${libname}.so -a "$ATLASLIBS" == "" ]; then
-        if nm  --dynamic $ATLASLIBDIR/lib${libname}.so  | grep clapack_cgetrf >/dev/null && \
-           nm  --dynamic $ATLASLIBDIR/lib${libname}.so  | grep ATL_cgetrf >/dev/null; then
-           ATLASLIBS="$ATLASLIBDIR/lib${libname}.so"
-           echo "Using library $ATLASLIBS as ATLAS's CLAPACK library."
-        fi
-      fi
-    done
-    if [ "$ATLASLIBS" == "" ]; then
-      echo Could not find any libraries $ATLASLIBDIR/{liblapack,liblapack_atlas,libclapack} that seem to be an ATLAS CLAPACK library.
-      return 1;
-    fi
-
-    for x in ${pt}cblas atlas ${pt}f77blas; do
-      if [ ! -f $ATLASLIBDIR/lib$x.so ]; then
-        echo "Configuring dynamic ATLAS libraries failed: Could not find library $x in directory $ATLASLIBDIR"
-        return 1;
-      fi
-      ATLASLIBS="$ATLASLIBS $ATLASLIBDIR/lib${x}.so"
-    done
-    if $threaded_atlas; then ATLASLIBS="$ATLASLIBS"; fi
-  fi
-
-  echo ATLASINC = $ATLASROOT/include/atlas >> kaldi.mk
-  echo ATLASLIBS = $ATLASLIBS >> kaldi.mk
-  echo ATLASLDFLAGS = -Wl,-rpath,$ATLASLIBDIR >> kaldi.mk
-  echo >> kaldi.mk
-  if [[ "$TARGET_ARCH" == arm* ]]; then
-    cat makefiles/linux_atlas_arm.mk >> kaldi.mk
-  elif [[ "$TARGET_ARCH" == ppc64le ]]; then
-    cat makefiles/linux_atlas_ppc64le.mk >> kaldi.mk
-  else
-    cat makefiles/linux_atlas.mk >> kaldi.mk
-  fi
-  $use_cuda && configure_cuda
-  linux_configure_speex
-  echo "Successfully configured for Linux [dynamic libraries] with ATLASLIBS =$ATLASLIBS"
 }
 
 #############################    CONFIGURATION    #############################
@@ -922,7 +840,7 @@ if is_set $HOST; then
 else
   TARGET_ARCH="`uname -m`"
 fi
-    
+
 #------------------------------------------------------------------------------
 # Matrix algebra library selection and validation.
 #--------------
@@ -1138,9 +1056,8 @@ elif [ "`uname -o`" == "Cygwin"  ]; then
 
 elif [ "`uname`" == "Linux" ]; then
   echo "On Linux: Checking for linear algebra header files ..."
-  echo "MATHLIB=$MATHLIB"
   if [ "$MATHLIB" == "ATLAS" ]; then
-    if [ ! -f $ATLASROOT/include/atlas/cblas.h ] || [ ! -f $ATLASROOT/include/atlas/clapack.h ] ; then
+    if [ ! -f $ATLASROOT/include/cblas.h ] || [ ! -f $ATLASROOT/include/clapack.h ] ; then
       failure "Could not find required header files cblas.h or clapack.h in ATLAS dir '$ATLASROOT/include'"
     fi
     echo "Using ATLAS as the linear algebra library."
