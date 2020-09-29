@@ -44,8 +44,8 @@ COPY . .
 
 # Set up Atlas
 RUN ln -sf /usr/include/x86_64-linux-gnu/atlas     /usr/local/include/atlas           \
- && ln -sf /usr/include/x86_64-linux-gnu/cblas.h   /usr/local/include/atlas/cblas.h   \
- && ln -sf /usr/include/x86_64-linux-gnu/clapack.h /usr/local/include/atlas/clapack.h \
+ && ln -sf /usr/include/x86_64-linux-gnu/cblas.h   /usr/local/include/cblas.h   \
+ && ln -sf /usr/include/x86_64-linux-gnu/clapack.h /usr/local/include/clapack.h \
  && ln -sf /usr/lib/x86_64-linux-gnu/atlas         /usr/local/lib/atlas
 
 RUN cd src/ \
