@@ -219,10 +219,8 @@ int main(int argc, char *argv[]) {
     feature_info.ivector_extractor_info.use_most_recent_ivector = true;
     feature_info.ivector_extractor_info.greedy_ivector_extractor = true;
 
+    // Should use feature_info.global_cmvn_stats
     Matrix<double> global_cmvn_stats;
-    if (feature_info.global_cmvn_stats_rxfilename != "")
-      ReadKaldiObject(feature_info.global_cmvn_stats_rxfilename,
-                      &global_cmvn_stats);
 
     TransitionModel trans_model;
     nnet3::AmNnetSimple am_nnet;
