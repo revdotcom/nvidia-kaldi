@@ -3,7 +3,7 @@
 ######################################################
 
 variables:
-    EXTRA_DOCKER_RUN_ARGS: "--shm-size=1G --ulimit memlock=-1 --ulimit stack=$$((1024*65536))"
+    EXTRA_DOCKER_RUN_ARGS: "--init --shm-size=1G --ulimit memlock=-1 --ulimit stack=$$((1024*65536))"
     DATADIR: /mnt/data/dldata
  
     # variables that may be overridden by the pipeline vars
@@ -255,7 +255,7 @@ gather:
     script:
     - export SCOPE1=${CI_JOB_NAME%% tests}; export SCOPE=${SCOPE1##Run all }
     - docker pull ${CI_REGISTRY}/dl/devops/scripts:nvdl_nightly_test_scheduler
-    - docker run --rm ${CI_REGISTRY}/dl/devops/scripts:nvdl_nightly_test_scheduler ${CI_PIPELINE_ID} ${CI_PROJECT_PATH} ${SCOPE}
+    - docker run --init --rm ${CI_REGISTRY}/dl/devops/scripts:nvdl_nightly_test_scheduler ${CI_PIPELINE_ID} ${CI_PROJECT_PATH} ${SCOPE}
     except:
     - tags
     when: manual
