@@ -42,6 +42,10 @@ check_required_programs:
 
 clean: openfst_cleaned sctk_cleaned
 
+dockerclean: clean
+	find . -name "*.o" -exec rm {} \;
+	find . -name "*.a" -exec rm {} \;
+
 distclean: clean
 	rm -rf openfst openfst-$(OPENFST_VERSION) \
 	       openfst-$(OPENFST_VERSION).tar.gz
