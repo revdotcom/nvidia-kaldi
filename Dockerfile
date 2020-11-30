@@ -1,4 +1,4 @@
-ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:11.1-devel-ubuntu18.04--master
+ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:11.1-devel-ubuntu20.04--master
 FROM ${FROM_IMAGE_NAME}
 
 ARG KALDI_VERSION
@@ -7,9 +7,11 @@ LABEL com.nvidia.kaldi.version="${KALDI_VERSION}"
 ARG NVIDIA_KALDI_VERSION
 ENV NVIDIA_KALDI_VERSION=${NVIDIA_KALDI_VERSION}
 
-ARG PYVER=3.6
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
+ARG PYVER=3.8
+ENV PYVER=${PYVER}
+RUN export MAJ=`echo "$PYVER" | cut -c1-1` \
+ && export DEBIAN_FRONTEND=noninteractive \
+ && apt-get update && apt-get install -yq --no-install-recommends \
         automake \
         autoconf \
         cmake \
@@ -18,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libatlas3-base \
         libtool \
         python$PYVER \
-        python$PYVER-dev \
+        python${PYVER}-dev \
         sox \
         subversion \
         unzip \
@@ -29,7 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 RUN rm -f /usr/bin/python && ln -s /usr/bin/python$PYVER /usr/bin/python
-RUN MAJ=`echo "$PYVER" | cut -c1-1` && \
+RUN export MAJ=`echo "$PYVER" | cut -c1-1` && \
     rm -f /usr/bin/python$MAJ && ln -s /usr/bin/python$PYVER /usr/bin/python$MAJ
 
 WORKDIR /opt/kaldi
