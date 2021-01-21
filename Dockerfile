@@ -78,6 +78,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 
 COPY nvidia_entrypoint.sh /usr/local/bin
 ENTRYPOINT ["/usr/local/bin/nvidia_entrypoint.sh"]
+COPY NVIDIA_Deep_Learning_Container_License.pdf /workspace/
 
 ARG NVIDIA_BUILD_ID
 ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}

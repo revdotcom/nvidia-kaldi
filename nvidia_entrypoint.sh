@@ -13,7 +13,10 @@ Container image Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
 Copyright 2015-2021, Kaldi contributors.  All rights reserved.
 
 Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
-NVIDIA modifications are covered by the license terms that apply to the underlying project or file.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
 EOF
 
 if [[ "$(find -L /usr -name libcuda.so.1 2>/dev/null | grep -v "compat") " == " " || "$(ls /dev/nvidiactl 2>/dev/null) " == " " ]]; then
