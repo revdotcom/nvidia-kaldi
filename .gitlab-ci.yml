@@ -391,14 +391,6 @@ L0_librispeech--T4_1GPU:
     <<: *L0_TEST
     <<: *T4_1GPU
 
-L0_aspire--P100_1GPU:
-    <<: *L0_TEST
-    <<: *P100_1GPU
-
-L0_aspire--P40_1GPU:
-    <<: *L0_TEST
-    <<: *P40_1GPU
-
 L0_aspire--V100_1GPU:
     <<: *L0_TEST
     <<: *V100_1GPU
