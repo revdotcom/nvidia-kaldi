@@ -3,7 +3,7 @@
 ######################################################
 
 variables:
-    EXTRA_DOCKER_RUN_ARGS: "--init --shm-size=1G --ulimit memlock=-1 --ulimit stack=$$((1024*65536))"
+    EXTRA_DOCKER_RUN_ARGS: "--init --shm-size=1G --ulimit memlock=-1 --ulimit stack=$$((1024*65536)) --label RUNNER_ID=$${RUNNER_ID}"
     DATADIR: /mnt/data/dldata
  
     # variables that may be overridden by the pipeline vars
