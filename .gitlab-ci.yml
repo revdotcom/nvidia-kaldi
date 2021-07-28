@@ -68,7 +68,7 @@ before_script:
                    --build-arg "NVIDIA_BUILD_ID=${CI_JOB_ID}"
                    --build-arg "NVIDIA_KALDI_VERSION=${RELEASE_BRANCH_NAME}"
                    --build-arg "KALDI_VERSION=${KALDI_VERSION}"
-                   --build-arg "PYVER=${PYVER}" .
+                   --build-arg "PYVER=${PYVER}" -f Dockerfile.base .
     - test "${VIRTUAL}" -ne 1 && docker push "${BASE_IMAGE_NAME}"
     - docker push "${BASE_IMAGE_NAME_VERSIONED}"
     - export CI_TMPDIR="${PWD}/${CI_JOB_ID}"
