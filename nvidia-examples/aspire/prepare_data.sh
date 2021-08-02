@@ -2,14 +2,25 @@
 
 model=aspire
 
-data=${1:-/workspace/data/}
-datasets=/workspace/datasets/
-models=/workspace/models/
+data=${1:-/workspace/data}
+datasets=/workspace/datasets
+models=/workspace/models
 
 # base url for downloads.
 data_url=www.openslr.org/resources/12
 lm_url=www.openslr.org/resources/11
 mfccdir=mfcc
+
+dldata=/dldata
+
+if [[ -d "$dldata" ]]; then
+  echo "Using local cache in $dldata"
+  ln -sf $dldata/data $data
+  ln -sf $dldata/datasets $datasets
+  ln -sf $dldata/models $models
+  ln -sf ../run_benchmark.sh
+  exit 0
+fi
 
 mkdir -p $data
 mkdir -p $models/$model
@@ -28,7 +39,7 @@ if [[ "$SKIP_DATA_DOWNLOAD" -ne "1" ]]; then
   echo ----------- Fetching dataset -----------
   # download the data.  
   for part in test-clean test-other; do
-    local/download_and_untar.sh $data $data_url $part
+    local/download_and_untar.sh $data/ $data_url $part
   done
   cp -R $data/LibriSpeech/ $data/aspire
 fi

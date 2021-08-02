@@ -51,24 +51,6 @@ function run_benchmark() {
   RTF=`cat $LOG_FILE | grep RealTimeX | cut -d' ' -f 3-`
   echo "  $RTF" &> $RTF_FILE
 
-  if [ -f "$MODEL_PATH/phones/word_boundary.int" ]; then
-    ALIGN_LOG="$LOCAL_RESULT_PATH/align.log"
-    #align words and add penalty
-    #we don't use this but it shows how to create a word aligned lattice
-    $KALDI_ROOT/src/latbin/lattice-add-penalty --word-ins-penalty=0 \
-      "ark:gunzip -c $LOCAL_RESULT_PATH/lat.gz |" "ark:-" | \
-      $KALDI_ROOT/src/latbin/lattice-align-words \
-      $MODEL_PATH/phones/word_boundary.int $MODEL_PATH/final.mdl \
-      "ark:-" "ark,t:|gzip -c > $LOCAL_RESULT_PATH/lat_aligned.gz" \
-      >> $ALIGN_LOG 2>&1
-    cat $ALIGN_LOG >> $LOG_FILE
-    WARNING=$(cat $ALIGN_LOG | grep "WARNING" || true)
-    if [ ! -z "$WARNING" ]; then
-      echo "$WARNING"
-      FAIL=1
-    fi
-  fi
-
   # convert lattice to transcript
   $KALDI_ROOT/src/latbin/lattice-best-path \
     "ark:gunzip -c $LOCAL_RESULT_PATH/lat.gz |"\
@@ -76,25 +58,8 @@ function run_benchmark() {
 
   gunzip -c $LOCAL_RESULT_PATH/trans_int.gz | sort -n > $LOCAL_RESULT_PATH/trans_int
 
-  #naively paste output together
-  #TODO how do we paste together more wisely?
-  #this doesn't work well.  need a way to paste together correctly
-  awk '{
-      start=match($1,"-[0-9]+-[0-9]+$")-1;
-      end=length($1)+2;
-      key=substr($1, 1, start);
-      trans=substr($0,end);
-      transcriptions[key]=transcriptions[key] trans
-    }
-    END {
-     for (key in transcriptions) {
-       print key " " transcriptions[key]
-     }
-  }' \
-  $LOCAL_RESULT_PATH/trans_int | sort -n > $LOCAL_RESULT_PATH/trans_int_combined
-  
   #translate ints to words
-  $KALDI_ROOT/egs/wsj/s5/utils/int2sym.pl -f 2- $RESULT_PATH/words.txt $LOCAL_RESULT_PATH/trans_int_combined> $LOCAL_RESULT_PATH/trans
+  $KALDI_ROOT/egs/wsj/s5/utils/int2sym.pl -f 2- $RESULT_PATH/words.txt $LOCAL_RESULT_PATH/trans_int> $LOCAL_RESULT_PATH/trans
 
   echo "Transcripts output to $LOCAL_RESULT_PATH/trans" 2>&1 >> $LOG_FILE
 
@@ -112,7 +77,7 @@ function run_benchmark() {
     # calculate wer
     $KALDI_ROOT/src/bin/compute-wer --mode=present \
       "ark:$LOCAL_RESULT_PATH/gold_text_ints_combined" \
-      "ark:$LOCAL_RESULT_PATH/trans_int_combined" >>$LOG_FILE 2>&1
+      "ark:$LOCAL_RESULT_PATH/trans_int" >>$LOG_FILE 2>&1
 
     # calculate character error rate
     if [ "$COMPUTE_CER" = "true" ]; then
@@ -274,19 +239,6 @@ else
   done
 fi
 
-echo "Computing segments"
-#compute full audio segments for each file in wav.scp located at ${DATASET}
-#this creates a segment file with the full length of audio to pass into get_uniform_subsegments
-$KALDI_ROOT/egs/wsj/s5/utils/data/get_segments_for_data.sh $DATASET > $RESULT_PATH/full_segments
-
-#compute subsegments
-#this creates a list of subsegments with a fixed size.  The output is a subsegment file.
-$KALDI_ROOT/egs/wsj/s5/utils/data/get_uniform_subsegments.py --overlap-duration 0.5 --max-segment-duration $SEGMENT_SIZE $RESULT_PATH/full_segments > $RESULT_PATH/subsegments
-
-#compute segments
-#this translates the subsegment file into a segment file that we can then decode on
-$KALDI_ROOT/egs/wsj/s5/utils/data/subsegment_data_dir.sh $DATASET $RESULT_PATH/subsegments $RESULT_PATH
-
 # copy vocabulary locally as lowercase (see below caveat for comment on this)
 cat $MODEL_PATH/words.txt | tr '[:upper:]' '[:lower:]' > $RESULT_PATH/words.txt
 
@@ -302,10 +254,7 @@ if [ -f  $DATASET/text ]; then
   $KALDI_ROOT/egs/wsj/s5/utils/sym2int.pl $oovtok -f 2- $RESULT_PATH/words.txt $RESULT_PATH/gold_text > $RESULT_PATH/gold_text_ints 2> /dev/null
 fi
 
-#extract segments into an archive
-echo "Extracting segments"
-$KALDI_ROOT/src/featbin/extract-segments scp:$DATASET/wav.scp $RESULT_PATH/segments ark,scp:$RESULT_PATH/segments.ark,$RESULT_PATH/segments.scp
-WAVIN="ark:$RESULT_PATH/segments.ark"
+WAVIN="scp:$WAVSCP"
 
 CUDAFLAGS=""
 CPUFLAGS=""

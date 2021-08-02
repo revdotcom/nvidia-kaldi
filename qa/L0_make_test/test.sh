@@ -1,5 +1,5 @@
 #!/bin/bash
 
 cd /opt/kaldi/src
-make test
+make -j$(nproc) test
 

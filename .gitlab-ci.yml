@@ -4,7 +4,7 @@
 
 variables:
     EXTRA_DOCKER_RUN_ARGS: "--init --shm-size=1G --ulimit memlock=-1 --ulimit stack=$$((1024*65536)) --label RUNNER_ID=$${RUNNER_ID}"
-    DATADIR: /mnt/data/dldata
+    DATADIR: /raid/dldata/kaldi/
  
     # variables that may be overridden by the pipeline vars
     API_LOGGING: 0
@@ -204,7 +204,7 @@ py3-stage:
       set -x &&
       docker run $(eval ${NV_DOCKER_ARGS})
              --name "${CONTAINER_NAME}"
-             -v $DATADIR:/data:ro
+             -v $DATADIR:/dldata:ro
              $(eval echo ${EXTRA_DOCKER_RUN_ARGS})
              -w ${TEST_WORK_DIR}
              ${DEVEL_IMAGE_NAME_VERSIONED}
@@ -300,15 +300,6 @@ gather:
 .1GPU: &1GPU
     tags:
     - 1GPU
-.P100_1GPU: &P100_1GPU
-    tags:
-    - P100
-    - 1GPU
-
-.P40_1GPU: &P40_1GPU
-    tags:
-    - P40
-    - 1GPU
 
 .V100_8GPU: &V100_8GPU
     tags:
@@ -355,37 +346,13 @@ L0_build_cpu:
     <<: *L0_TEST
     <<: *1GPU
 
-L0_make_test--P100_1GPU:
-    <<: *L0_TEST
-    <<: *P100_1GPU
-
-L0_make_test--P40_1GPU:
-    <<: *L0_TEST
-    <<: *P40_1GPU
-
 L0_make_test--V100_1GPU:
     <<: *L0_TEST
     <<: *V100_1GPU
 
-L0_make_test--T4_1GPU:
+L0_librispeech--V100_1GPU:
     <<: *L0_TEST
-    <<: *T4_1GPU
-
-L0_egs_voxforge--P100_1GPU:
-    <<: *L0_TEST
-    <<: *P100_1GPU
-
-L0_librispeech--P100_1GPU:
-    <<: *L0_TEST
-    <<: *P100_1GPU
-
-L0_librispeech--P40_1GPU:
-    <<: *L0_TEST
-    <<: *P40_1GPU
-
-L0_librispeech--V100_8GPU:
-    <<: *L0_TEST
-    <<: *V100_8GPU
+    <<: *V100_1GPU
 
 L0_librispeech--T4_1GPU:
     <<: *L0_TEST
