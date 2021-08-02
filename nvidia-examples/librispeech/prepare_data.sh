@@ -7,14 +7,26 @@ source ../default_parameters.inc
 
 model=LibriSpeech
 
-data=${1:-$WORKSPACE/data/}
-datasets=$WORKSPACE/datasets/
-models=$WORKSPACE/models/
+data=${1:-$WORKSPACE/data}
+datasets=$WORKSPACE/datasets
+models=$WORKSPACE/models
 
 # base url for downloads.
 data_url=www.openslr.org/resources/12
 lm_url=www.openslr.org/resources/11
 mfccdir=mfcc
+
+dldata=/dldata
+
+if [[ -d "$dldata" ]]; then
+  echo "Using local cache in $dldata"
+  ln -sf $dldata/data $data
+  ln -sf $dldata/datasets $datasets
+  ln -sf $dldata/models $models
+  ln -sf ../run_benchmark.sh
+  exit 0
+fi
+
 
 mkdir -p $data/$model
 mkdir -p $models/$model
@@ -36,7 +48,7 @@ if [[ "$SKIP_DATA_DOWNLOAD" -ne "1" ]]; then
   # now; later in the script we'll download more and use it to train neural
   # nets.
   for part in test-clean test-other; do
-    local/download_and_untar.sh $data $data_url $part
+    local/download_and_untar.sh $data/ $data_url $part
   done
 fi
 
