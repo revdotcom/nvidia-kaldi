@@ -1,6 +1,7 @@
 ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:11.4-devel-ubuntu20.04--3052695
 FROM ${FROM_IMAGE_NAME}
 
+ENV NVIDIA_PRODUCT_NAME="Kaldi"
 ARG KALDI_VERSION
 ENV KALDI_VERSION=${KALDI_VERSION}
 LABEL com.nvidia.kaldi.version="${KALDI_VERSION}"
@@ -76,9 +77,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && ldconfig \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 
-COPY nvidia_entrypoint.sh /usr/local/bin
-ENTRYPOINT ["/usr/local/bin/nvidia_entrypoint.sh"]
-COPY NVIDIA_Deep_Learning_Container_License.pdf /workspace/
+COPY entrypoint.d/ /opt/nvidia/entrypoint.d/
 
 ARG NVIDIA_BUILD_ID
 ENV NVIDIA_BUILD_ID ${NVIDIA_BUILD_ID:-<unknown>}

@@ -1,0 +1,1 @@
+Copyright 2015-2021, Kaldi contributors.  All rights reserved.
