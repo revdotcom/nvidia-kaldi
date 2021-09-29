@@ -1,4 +1,4 @@
-ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:11.4-devel-ubuntu20.04--3058026
+ARG FROM_IMAGE_NAME=gitlab-master.nvidia.com:5005/dl/dgx/cuda:11.4-devel-ubuntu20.04--3084502
 FROM ${FROM_IMAGE_NAME}
 
 ENV NVIDIA_PRODUCT_NAME="Kaldi"
