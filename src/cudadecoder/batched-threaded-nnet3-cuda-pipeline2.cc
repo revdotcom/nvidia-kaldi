@@ -312,7 +312,7 @@ void BatchedThreadedNnet3CudaPipeline2::SegmentedDecodeWithCallback(
         int n_not_done = n_segments_callbacks_not_done_->fetch_sub(1);
         if (n_not_done == 1 && segmented_callback) {
           SegmentedLatticeCallbackParams params;
-          params.results = *segmented_results;
+          params.results = std::move(*segmented_results);
           segmented_callback(params);
         }
       };
@@ -458,7 +458,7 @@ void BatchedThreadedNnet3CudaPipeline2::SetLatticePostprocessor(
   lattice_postprocessor_ = lattice_postprocessor;
   lattice_postprocessor_->SetDecoderFrameShift(
       cuda_online_pipeline_.GetDecoderFrameShiftSeconds());
-  lattice_postprocessor_->SetTransitionModel(
+  lattice_postprocessor_->SetTransitionInformation(
       &cuda_online_pipeline_.GetTransitionModel());
 }
 

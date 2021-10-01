@@ -84,7 +84,7 @@ struct BatchedThreadedNnet3CudaOnlinePipelineConfig {
                  "Advanced - Number of worker threads used in the"
                  " decoder for the host to host copies.");
     po->Register("gpu-feature-extract", &use_gpu_feature_extraction,
-                 "Use GPU feature extraction");
+                 "Use GPU feature extraction.");
     po->Register(
         "reset-on-endpoint", &reset_on_endpoint,
         "Reset a decoder channel when endpoint detected. Do not close stream");
@@ -136,10 +136,17 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
       const nnet3::AmNnetSimple &am_nnet, const TransitionModel &trans_model)
       : config_(config),
         max_batch_size_(config.max_batch_size),
+	num_channels_(std::max(max_batch_size_ * KALDI_CUDA_DECODER_MIN_NCHANNELS_FACTOR, config_.num_channels)),
+        channels_info_(num_channels_),
         trans_model_(&trans_model),
         am_nnet_(&am_nnet),
+        available_channels_(num_channels_),
         partial_hypotheses_(NULL),
         end_points_(NULL),
+        is_end_of_segment_(max_batch_size_),
+        is_end_of_stream_(max_batch_size_),
+        n_samples_valid_(max_batch_size_),
+        n_input_frames_valid_(max_batch_size_),
         word_syms_(NULL) {
     config_.compute_opts.CheckAndFixConfigs(am_nnet_->GetNnet().Modulus());
     config_.CheckAndFixConfigs();
@@ -163,18 +170,26 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
   bool TryInitCorrID(CorrelationID corr_id, int wait_for = 0);
 
   void SetBestPathCallback(CorrelationID corr_id,
+                           BestPathCallback &&callback);
+  void SetBestPathCallback(CorrelationID corr_id,
                            const BestPathCallback &callback);
 
   // Set the callback function to call with the final lattice for a given
   // corr_id
+  void SetLatticeCallback(CorrelationID corr_id,
+                          LatticeCallback &&callback);
   void SetLatticeCallback(CorrelationID corr_id,
                           const LatticeCallback &callback);
 
   // Set callback using SegmentedResultsCallback
   // Able to run lattice postprocessor and generate CTM outputs
   void SetLatticeCallback(CorrelationID corr_id,
+                          SegmentedResultsCallback &&callback,
+                          const int result_type);
+  void SetLatticeCallback(CorrelationID corr_id,
                           const SegmentedResultsCallback &callback,
                           const int result_type);
+
   // Lattice postprocessor
   // Applied on both lattice output or CTM output
   // Optional if lattice output is used
@@ -314,8 +329,7 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
                                const std::vector<bool> &is_last_chunk);
 
   void RunBestPathCallbacks(const std::vector<CorrelationID> &corr_ids,
-                            const std::vector<int> &channels,
-                            const std::vector<bool> &is_last_chunk);
+                            const std::vector<int> &channels);
 
   void RunLatticeCallbacks(const std::vector<CorrelationID> &corr_ids,
                            const std::vector<int> &channels,
@@ -370,10 +384,10 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
 
   BatchedThreadedNnet3CudaOnlinePipelineConfig config_;
 
-  // Using unique_ptr to be able to allocate the vector directly with the right
-  // size We cannot move std::atomic
-  std::unique_ptr<std::vector<ChannelInfo>> channels_info_;
   int32 max_batch_size_;  // extracted from config_
+  int32 num_channels_;
+
+  std::vector<ChannelInfo> channels_info_;
   // Models
   const TransitionModel *trans_model_;
   const nnet3::AmNnetSimple *am_nnet_;
@@ -416,7 +430,7 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
 
   std::vector<int> n_samples_valid_, n_input_frames_valid_;
 
-  std::vector<std::vector<std::pair<int, BaseFloat *>>>
+  std::vector<std::vector<std::pair<int, const BaseFloat *>>>
       all_frames_log_posteriors_;
 
   // Channels done after current batch. We've just received
@@ -469,9 +483,6 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
   // Only used if feature extraction is run on the CPU
   std::vector<std::unique_ptr<OnlineNnet2FeaturePipeline>> feature_pipelines_;
 
-  // Use to postprocess lattices/generate CTM outputs
-  std::shared_ptr<LatticePostprocessor> lattice_postprocessor_;
-
   // Ordering of the cuda_fst_ w.r.t. thread_pool_ and the decoder is important:
   // order of destruction is bottom-up, opposite to the order of construction.
   // We want the FST object, which is entirely passive and only frees device
@@ -485,7 +496,10 @@ class BatchedThreadedNnet3CudaOnlinePipeline {
   // in GPU memory.
   std::unique_ptr<CudaFst> cuda_fst_;
 
-  // The thread pool receives data from device and post-processes it. This class
+  // Use to postprocess lattices/generate CTM outputs
+  std::shared_ptr<LatticePostprocessor> lattice_postprocessor_;
+
+    // The thread pool receives data from device and post-processes it. This class
   // destructor blocks until the thread pool is drained of work items.
   std::unique_ptr<ThreadPoolLight> thread_pool_;
 
