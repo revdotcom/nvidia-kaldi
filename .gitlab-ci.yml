@@ -544,23 +544,21 @@ IV_tl-PH--V100_1GPU:
       TEST_WORK_DIR: "/opt/kaldi/qa/IV_model"
       TEST_SCRIPT: "./test-tl-PH.sh"
 
-##### contamer vulnerability analysis test
-L1_contamer:
-    stage: test
-    script:
-    - export CI_TMPDIR="${PWD}/${CI_JOB_ID}"
-    - export CONTAMERDIR="${CI_TMPDIR}/contamer" && echo "CONTAMERDIR=${CONTAMERDIR}"
-    # git clone based on tag 2.0.0
-    - git config --global advice.detachedHead false
-    - git clone --branch master --single-branch "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/devops/contamer.git" "${CONTAMERDIR}"
-    - cd "${CONTAMERDIR}"
-    - pip3 install -r requirements.txt
-    - docker pull "${BASE_IMAGE_NAME_VERSIONED}"
-    - python3 contamer.py --fail-on-non-os -ls "${BASE_IMAGE_NAME_VERSIONED}"
-    only:
-    - /^.*-devel$/
-    - /^master$/
-    except:
-    - tags
-    tags:
-    - contamer
+#####################################################################################################
+# pulse scan
+# scan all images in the manifest
+#####################################################################################################
+include:
+  - project: dl/devops/pulse
+    ref: main
+    file: /.pulse-container-scan-template.yml
+
+L1_pulse--py3:
+  extends: .pulse-container-scanner-job
+  variables:
+    NSPECT_ID: "NSPECT-FW4K-2BHJ"
+  script:
+    - !reference [.pulse_scan_script]
+    - pulse_scan_manifest ${NSPECT_ID} ${BASE_IMAGE_NAME_VERSIONED}
+  needs: [ "py3-base" ]
+
