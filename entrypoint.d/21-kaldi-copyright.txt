@@ -1,1 +1,1 @@
-Copyright 2015-2021, Kaldi contributors.  All rights reserved.
+Copyright 2015-2022, Kaldi contributors.  All rights reserved.
