@@ -8,7 +8,12 @@ MODEL_PATH=${MODEL_PATH:-"${WORKSPACE}/models/LibriSpeech/"}
 DATASET=${DATASET:-"${WORKSPACE}/datasets/LibriSpeech/test_clean/"}
 
 GPU=${GPU:-0}
-COPY_THREADS=${COPY_THREADS:-2}
+# This might be problematic if using a spin lock.
+# COPY_THREADS=${COPY_THREADS:-4}
+COPY_THREADS=${COPY_THREADS:-4}
+CPU_THREADS=`cat /proc/cpuinfo | awk '/^processor/{print $3}' | wc -l`
+WORKER_THREADS=${WORKER_THREADS:-$(($CPU_THREADS - $COPY_THREADS))}
+BATCHING_COPY_THREADS=${BATCHING_COPY_THREADS:-8}
 
 BEAM=${BEAM:-10}
 LATTICE_BEAM=${LATTICE_BEAM:-7}
@@ -18,7 +23,10 @@ AUX_Q_CAPACITY=${AUX_Q_CAPACITY:-400000}
 
 #query GPU memory
 gpu_memory=`nvidia-smi -q -i $GPU | grep -A1 "FB Memory" | grep Total | tr -s " " | cut -d " " -f 4`
-if [ $gpu_memory -ge 16000 ]; then
+
+if [ $gpu_memory -ge 32000 ]; then
+  MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-1200}
+elif [ $gpu_memory -ge 16000 ]; then
   MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-600}
 elif [ $gpu_memory -ge 8000 ]; then
   MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-200}

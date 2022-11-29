@@ -29,6 +29,7 @@ function run_benchmark() {
     stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
     --num-parallel-streaming-channels=$ONLINE_NUM_PARALLEL_STREAMING_CHANNELS \
+    --word-symbol-table="$MODEL_PATH/words.txt" \
     $MODEL_PATH/final.mdl \
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
@@ -37,6 +38,7 @@ function run_benchmark() {
   else
     stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
+    --use-online-features=true \
     $MODEL_PATH/final.mdl \
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
@@ -138,12 +140,15 @@ function run_benchmark() {
   exit $FAIL
 }
 
-#NVPROF="nvprof -f -o profile.out"
-
 #set local model parameters
 source ./default_parameters.inc
 #set global model parameters
 source ../default_parameters.inc
+
+#NVPROF="nvprof -f -o profile.out"
+#  --gpu-metrics-device=all
+NVPROF="nsys profile --capture-range cudaProfilerApi -t nvtx,cuda,osrt --force-overwrite true -o $KALDI_ROOT/kaldi_a100_online.nsys-rep"
+#NVPROF="nsys profile -t nvtx --force-overwrite true -o $KALDI_ROOT/kaldi_a100_online_nvtx.nsys-rep"
 
 NUM_PROCESSES=${NUM_PROCESSES:-1}
 NUM_GPUS=`nvidia-smi -L | wc -l`
@@ -211,6 +216,23 @@ RESULT_PATH="$OUTPUT_PATH/$RUN"
 mkdir -p $RESULT_PATH
 
 WAVSCP=$DATASET/wav.scp
+WAVCONVSCP=$DATASET/wav_conv.scp
+
+if $USE_RAM_DISK; then
+    sudo mkdir -p /mnt/ramdisk
+    sudo umount /mnt/ramdisk
+    sudo mount -t tmpfs -o size=1024m tmpfs /mnt/ramdisk
+    data_dir=${WORKSPACE}/data/LibriSpeech/test-clean/
+    find $data_dir -name '*.wav' -print0 |
+        while IFS= read -r -d '' file; do
+            output_path=/mnt/ramdisk/${file#$data_dir}
+            output_dir=$(dirname $output_path)
+            mkdir -p $output_dir && cp $file $output_dir
+        done
+    WAVRAMSCP=/mnt/ramdisk/wav.scp
+    sed "s;$data_dir;/mnt/ramdisk/;g" < $WAVCONVSCP >$WAVRAMSCP
+fi
+
 
 if [ -f $WAVSCP ]; then
   echo "Found wav.scp file using that"
@@ -254,15 +276,19 @@ if [ -f  $DATASET/text ]; then
   $KALDI_ROOT/egs/wsj/s5/utils/sym2int.pl $oovtok -f 2- $RESULT_PATH/words.txt $RESULT_PATH/gold_text > $RESULT_PATH/gold_text_ints 2> /dev/null
 fi
 
-WAVIN="scp:$WAVSCP"
+if $USE_RAM_DISK; then
+    WAVIN="scp:$WAVRAMSCP"
+else
+    WAVIN="scp:$WAVCONVSCP"
+fi
 
 CUDAFLAGS=""
 CPUFLAGS=""
 
 if [ $USE_GPU -eq 1 ]; then
-  NUM_CHANNELS=$(($MAX_BATCH_SIZE + $MAX_BATCH_SIZE/2))
+  NUM_CHANNELS=$((2*$MAX_BATCH_SIZE))
   #Set CUDA decoder specific flags
-  CUDAFLAGS="--num-channels=$NUM_CHANNELS --cuda-use-tensor-cores=true --main-q-capacity=$MAIN_Q_CAPACITY --aux-q-capacity=$AUX_Q_CAPACITY --cuda-memory-proportion=.5 --max-batch-size=$MAX_BATCH_SIZE --cuda-worker-threads=$WORKER_THREADS  --file-limit=$FILE_LIMIT --cuda-decoder-copy-threads=$COPY_THREADS"
+  CUDAFLAGS="--num-channels=$NUM_CHANNELS --cuda-use-tensor-cores=true --main-q-capacity=$MAIN_Q_CAPACITY --aux-q-capacity=$AUX_Q_CAPACITY --cuda-memory-proportion=.5 --max-batch-size=$MAX_BATCH_SIZE --cuda-worker-threads=$WORKER_THREADS  --file-limit=$FILE_LIMIT --cuda-decoder-copy-threads=$COPY_THREADS --batching-copy-threads=$BATCHING_COPY_THREADS"
   SPK2UTT=""
 else
   SPK2UTT=ark:$RESULT_PATH/spk2utt.ark

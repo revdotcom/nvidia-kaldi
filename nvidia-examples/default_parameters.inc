@@ -24,6 +24,7 @@ AUX_Q_CAPACITY=${AUX_Q_CAPACITY:-500000}
 COMPUTE_CER=${COMPUTE_CER:-false}
 FRAME_SUBSAMPLING_FACTOR=${FRAME_SUBSAMPLING_FACTOR:-3}
 COPY_THREADS=${COPY_THREADS:-4}
+BATCHING_COPY_THREADS=${BATCHING_COPY_THREADS:-8}
 FRAMES_PER_CHUNK_OFFLINE=${FRAMES_PER_CHUNK:-153}
 FRAMES_PER_CHUNK_ONLINE=${FRAMES_PER_CHUNK:-51}
 SEGMENT_SIZE=${SEGMENT_SIZE:-30}
@@ -31,7 +32,9 @@ OUTPUT_PATH=${OUTPUT_PATH:-"/tmp/results/$MODEL_NAME"}
 
 #query GPU memory
 gpu_memory=`nvidia-smi -q -i $GPU | grep -A1 "FB Memory" | grep Total | tr -s " " | cut -d " " -f 4`
-if [ $gpu_memory -ge 16000 ]; then
+if [ $gpu_memory -ge 32000 ]; then
+  MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-1200}
+elif [ $gpu_memory -ge 16000 ]; then
   MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-600}
 elif [ $gpu_memory -ge 8000 ]; then
   MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-200}
@@ -46,3 +49,5 @@ fi
 if [ ${WORKER_THREADS} -lt 1 ]; then
     WORKER_THREADS=1
 fi
+
+USE_RAM_DISK=false
