@@ -39,6 +39,7 @@ function run_benchmark() {
     stdbuf -o 0 $NVPROF $DECODER $CUDAFLAGS $CPUFLAGS $FLAGS \
     --config="$MODEL_PATH/conf/online.conf"\
     --use-online-features=true \
+    --print-partial-hypotheses=true \
     $MODEL_PATH/final.mdl \
     $MODEL_PATH/HCLG.fst \
     $SPK2UTT \
