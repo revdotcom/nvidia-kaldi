@@ -35,7 +35,7 @@
 #include <cuda_runtime_api.h>
 #include <curand.h>
 #include <cusparse.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 #define CU_SAFE_CALL(fun) \
 { \

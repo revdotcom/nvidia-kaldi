@@ -26,7 +26,7 @@
 
 #include <memory>
 
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 #include "base/kaldi-utils.h"
 #include "cudadecoder/cuda-fst.h"

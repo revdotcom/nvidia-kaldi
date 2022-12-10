@@ -18,7 +18,7 @@
 #include "cudafeat/feature-online-batched-spectral-cuda-kernels.h"
 
 #include <cub/cub.cuh>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 #include "cudafeat/lane-desc.h"
 #include "cudamatrix/cu-rand.h"

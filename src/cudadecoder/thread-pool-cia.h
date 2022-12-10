@@ -29,7 +29,7 @@
 #include <vector>
 
 #ifdef __linux__
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif // __linux__

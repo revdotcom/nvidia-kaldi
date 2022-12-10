@@ -23,7 +23,7 @@
 
 #include <atomic>
 
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 namespace kaldi {
 namespace cuda_decoder {

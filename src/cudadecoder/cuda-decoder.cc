@@ -43,7 +43,7 @@
 #endif // __linux__
 
 #include <cuda_runtime_api.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 #include "base/kaldi-utils.h"
 #include "cudadecoder/cuda-decoder-kernels.h"

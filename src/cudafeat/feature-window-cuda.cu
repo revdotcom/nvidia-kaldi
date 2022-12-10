@@ -17,7 +17,7 @@
 
 #include "cudafeat/feature-window-cuda.h"
 
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 #include "matrix/matrix-functions.h"
 

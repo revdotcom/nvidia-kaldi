@@ -20,7 +20,7 @@
 
 #include "cudafeat/online-batched-feature-pipeline-cuda.h"
 
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 namespace kaldi {
 

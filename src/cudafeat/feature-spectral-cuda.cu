@@ -17,7 +17,7 @@
 
 #include "cudafeat/feature-spectral-cuda.h"
 
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 #include <cub/cub.cuh>
 
 #include "cudamatrix/cu-rand.h"
