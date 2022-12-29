@@ -112,6 +112,44 @@ bool LatticePostprocessor::GetCTM(CompactLattice &clat,
   return true;
 }
 
+std::vector<NBestResult> LatticePostprocessor::GetNBestList(CompactLattice &clat) const {
+  if (clat.NumStates() == 0) return std::vector<NBestResult>{};
+
+  std::vector<NBestResult> result;
+
+  CompactLattice postprocessed_clat;
+  GetPostprocessedLattice(clat, &postprocessed_clat);
+  Lattice postprocessed_lat;
+  ConvertLattice(postprocessed_lat, &postprocessed_lat);
+  Lattice nbest_lat;
+  fst::ShortestPath(postprocessed_lat, &nbest_lat, config_.nbest);
+  std::vector<Lattice> nbest_lats;
+  fst::ConvertNbestToVector(nbest_lat, &nbest_lats);
+  for (size_t i = 0; i < nbest_lats.size(); ++i) {
+    std::vector<int32> alignment;
+    std::vector<int32> words;
+    LatticeWeight weight;
+    GetLinearSymbolSequence(nbest_lats[i], &alignment, &words, &weight);
+    float score = weight.Value1() + weight.Value2();
+
+    CompactLattice nbest_clat;
+    ConvertLattice(nbest_lats[i], &nbest_clat);
+    std::vector<int32> begin_times;
+    std::vector<int32> lengths;
+    bool ok = CompactLatticeToWordAlignment(nbest_clat, &words, &begin_times, &lengths);
+    KALDI_ASSERT(ok);
+    std::vector<std::pair<BaseFloat, BaseFloat>> times_seconds(begin_times.size());
+    for (std::size_t i = 0; i < times_seconds.size(); ++i) {
+      times_seconds[i].first = begin_times[i] * decoder_frame_shift_;
+      times_seconds[i].second = (begin_times[i] + lengths[i]) * decoder_frame_shift_;
+    }
+    result.push_back(NBestResult{.score = score,
+          .words = std::move(words),
+          .times_seconds = std::move(times_seconds)});
+  }
+  return result;
+}
+
 void SetResultUsingLattice(
     CompactLattice &clat, const int result_type,
     const std::shared_ptr<LatticePostprocessor> &lattice_postprocessor,

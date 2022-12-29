@@ -65,6 +65,12 @@ struct CTMResult {
   std::vector<std::pair<BaseFloat, BaseFloat> > times_seconds;
 };
 
+struct NBestResult {
+  BaseFloat score;
+  std::vector<int32> words;
+  std::vector<std::pair<BaseFloat, BaseFloat> > times_seconds;
+};
+
 // Struct to provide a result back to the user
 class CudaPipelineResult {
   int result_type_;
@@ -77,6 +83,7 @@ class CudaPipelineResult {
  public:
   static constexpr int RESULT_TYPE_LATTICE = 1;
   static constexpr int RESULT_TYPE_CTM = 2;
+  static constexpr int RESULT_TYPE_NBEST_LIST = 4;
 
   CudaPipelineResult()
       : result_type_(0),

@@ -46,6 +46,9 @@ struct LatticePostprocessorConfig {
   BaseFloat lm2acoustic_scale = 0.0;
   BaseFloat word_ins_penalty = 0.0;
 
+  // Nbest list arguments
+  int32 nbest = 1;
+
   void Register(OptionsItf *po) {
     po->Register(
         "max-expand", &max_expand,
@@ -65,6 +68,9 @@ struct LatticePostprocessorConfig {
                  "Word insertion penalty.");
     po->Register("word-boundary-rxfilename", &word_boundary_rxfilename,
                  "Word boundary file");
+
+    po->Register("nbest", &nbest,
+                 "number of best transcripts to return from GetNBestList(). Default is 1");
 
     mbr_opts.Register(po);
     wip_opts.Register(po);
@@ -86,6 +92,7 @@ class LatticePostprocessor {
   bool GetCTM(CompactLattice &clat, CTMResult *ctm_result) const;
   bool GetPostprocessedLattice(CompactLattice &clat,
                                CompactLattice *out_clat) const;
+  std::vector<NBestResult> GetNBestList(CompactLattice &clat) const;
 
   void SetTransitionInformation(const TransitionInformation *tmodel) { tmodel_ = tmodel; }
 
