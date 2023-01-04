@@ -1303,7 +1303,7 @@ void CudaDecoder::AddFinalTokensToLattice(
         {state_internal_id, {FLT_MAX, -1, false}});
 
     // If we've inserted the element, it means that that state
-    // didn't exist in the map Because this is a final state, we
+    // didn't exist in the map. Because this is a final state, we
     // need to do a bit of extra work to add the final_cost to it
     if (inserted) {
       // We want to figure out which FST state this token is
@@ -1682,6 +1682,7 @@ void CudaDecoder::ConcurrentGetRawLatticeSingleChannel(const ChannelId ichannel,
     // in the token list
     const int32 curr_frame_offset =
         (iframe >= 0) ? frame_offsets_[ichannel][iframe] : 0;
+    const int32 prev_frame_offset = (iframe - 1 < frame_offsets_[ichannel].size()) ? frame_offsets_[ichannel][iframe + 1] : 0;
 
     // bool must_replay_frame
     // In some cases we can update an extra_cost that has already
@@ -1715,6 +1716,8 @@ void CudaDecoder::ConcurrentGetRawLatticeSingleChannel(const ChannelId ichannel,
         InfoToken token;
         std::tie(token_idx, token) = q_curr_frame_todo[u];
         KALDI_ASSERT(token_idx >= curr_frame_offset);
+        KALDI_ASSERT(prev_frame_offset == 0 || token_idx < prev_frame_offset);
+
         CostType token_extra_cost;
         StateId to_fst_lattice_state;
         // Loading the current extra_cost of that token
@@ -2070,6 +2073,7 @@ void CudaDecoder::BuildPartialHypothesisOutput(
 void CudaDecoder::ComputeH2HCopies() {
   // Waiting for either something to do or the instruction to stop the
   // threads
+  nvtxRangePush("ComputeH2HCopies");
   {
     std::unique_lock<std::mutex> n_h2h_lk(n_h2h_main_task_todo_mutex_);
     n_h2h_main_task_todo_cv_.wait(n_h2h_lk, [this] {
@@ -2134,8 +2138,15 @@ void CudaDecoder::ComputeH2HCopies() {
     all_done = (--n_h2h_task_not_done_ == 0);
   }
   if (all_done) {
+    // this causes a long pthread_cond_wait in CopyMainQueueToHostData
+    // in WaitForH2HCopies... But why do we need to wait if we are
+    // double-buffering? Because the variables like
+    // h_acoustic_cost_concat_tmp_ and h_acoustic_cost_concat_ can
+    // change...
+    // should this be inside the mutex critical section?
     h2h_done_.notify_all();
   }
+  nvtxRangePop();
 }
 
 void CudaDecoder::SetThreadPoolAndStartCPUWorkers(futures_thread_pool *thread_pool,
