@@ -120,7 +120,7 @@ std::vector<NBestResult> LatticePostprocessor::GetNBestList(CompactLattice &clat
   CompactLattice postprocessed_clat;
   GetPostprocessedLattice(clat, &postprocessed_clat);
   Lattice postprocessed_lat;
-  ConvertLattice(postprocessed_lat, &postprocessed_lat);
+  ConvertLattice(postprocessed_clat, &postprocessed_lat);
   Lattice nbest_lat;
   fst::ShortestPath(postprocessed_lat, &nbest_lat, config_.nbest);
   std::vector<Lattice> nbest_lats;
