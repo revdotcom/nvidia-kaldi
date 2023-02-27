@@ -68,6 +68,10 @@ struct DeviceParams {
   int32 adaptive_beam_bin_width;
 
   CostType fst_zero;
+
+  CostType blank_penalty;
+  int32 blank_ilabel;
+  CostType length_penalty;
 };
 
 // KernelParams contains all the kernels arguments that change between kernel

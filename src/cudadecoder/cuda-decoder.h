@@ -56,6 +56,9 @@ struct CudaDecoderConfig {
   int32 main_q_capacity, aux_q_capacity;
   int32 max_active;
   OnlineEndpointConfig endpointing_config;
+  CostType blank_penalty;
+  int32 blank_ilabel;
+  CostType length_penalty;
 
   CudaDecoderConfig()
       : default_beam(15.0),
@@ -63,7 +66,10 @@ struct CudaDecoderConfig {
         ntokens_pre_allocated(1000000),
         main_q_capacity(-1),
         aux_q_capacity(-1),
-        max_active(10000) {}
+        max_active(10000),
+        blank_penalty(0.0),
+        blank_ilabel(-1),
+        length_penalty(0.0) {}
 
   void Register(OptionsItf *opts) {
     opts->Register("beam", &default_beam,
@@ -83,6 +89,12 @@ struct CudaDecoderConfig {
                    "buffers. "
                    "If this size is exceeded the buffer will reallocate, "
                    "reducing performance.");
+    opts->Register("blank-penalty", &blank_penalty,
+                   "Only for CTC Models. Adds 'blank_penalty' to score in ProcessEmitting whenever ilabel == blank-ilabel.");
+    opts->Register("blank-ilabel", &blank_ilabel,
+                   "If not -1, enables blank_penalty. Set to the ilabel equal to blank.");
+    opts->Register("length-penalty", &length_penalty,
+                   "length_penalty is added in ProcessEmitting every time a non-self-loop is processed.");
     std::ostringstream main_q_capacity_desc;
     main_q_capacity_desc
         << "Advanced - Capacity of the main queue : Maximum number "
@@ -144,6 +156,9 @@ struct CudaDecoderConfig {
   void Check() const {
     KALDI_ASSERT(default_beam > 0.0 && ntokens_pre_allocated >= 0 &&
                  lattice_beam >= 0.0f && max_active > 0);
+    if (blank_penalty != 0.0) {
+      KALDI_ASSERT(blank_ilabel != -1);
+    }
   }
 
   void ComputeConfig() {

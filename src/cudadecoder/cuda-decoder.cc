@@ -343,6 +343,10 @@ void CudaDecoder::InitDeviceParams() {
   h_device_params_->h_list_final_tokens_in_main_q =
       h_list_final_tokens_in_main_q_.GetView();
   h_device_params_->fst_zero = CudaFst::Weight::Zero().Value();
+
+  h_device_params_->blank_penalty = config_.blank_penalty;
+  h_device_params_->blank_ilabel = config_.blank_ilabel;
+  h_device_params_->length_penalty = config_.length_penalty;
 }
 
 CudaDecoder::~CudaDecoder() noexcept(false) {

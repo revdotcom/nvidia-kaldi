@@ -726,6 +726,13 @@ __global__ void expand_arcs_kernel(DeviceParams cst_dev_params,
           const int32 arc_ilabel = cst_dev_params.d_arc_pdf_ilabels[arc_idx];
           CostType acoustic_cost = -lane_counters->loglikelihoods[arc_ilabel];
           total_cost += acoustic_cost;
+          total_cost += (arc_ilabel == cst_dev_params.blank_ilabel) ?
+            cst_dev_params.blank_penalty : 0.0;
+          if (cst_dev_params.length_penalty != 0.0) {
+            int32 current_state = cst_dev_params.d_main_q_state_and_cost.channel(ichannel)[main_q_idx].x;
+            total_cost += (current_state != arc_next_state) ?
+              cst_dev_params.length_penalty : 0.0;
+          }
         }
         int_total_cost = floatToOrderedInt(total_cost);
 
