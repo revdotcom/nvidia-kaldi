@@ -67,8 +67,12 @@ struct CTMResult {
 
 struct NBestResult {
   BaseFloat score;
+  // note that these are ilabels of the the WFST. You may want to
+  // subtract 1 from them.
+  std::vector<int32> ilabels;
   std::vector<int32> words;
-  std::vector<std::pair<BaseFloat, BaseFloat> > times_seconds;
+  std::vector<BaseFloat> word_start_times_seconds;
+  std::vector<BaseFloat> word_durations_seconds;
 };
 
 // Struct to provide a result back to the user

@@ -138,14 +138,18 @@ std::vector<NBestResult> LatticePostprocessor::GetNBestList(CompactLattice &clat
     std::vector<int32> lengths;
     bool ok = CompactLatticeToWordAlignment(nbest_clat, &words, &begin_times, &lengths);
     KALDI_ASSERT(ok);
+    std::vector<BaseFloat> begin_times_seconds(begin_times.size());
+    std::vector<BaseFloat> lengths_seconds(lengths.size());
     std::vector<std::pair<BaseFloat, BaseFloat>> times_seconds(begin_times.size());
     for (std::size_t i = 0; i < times_seconds.size(); ++i) {
-      times_seconds[i].first = begin_times[i] * decoder_frame_shift_;
-      times_seconds[i].second = (begin_times[i] + lengths[i]) * decoder_frame_shift_;
+      begin_times_seconds[i] = begin_times[i] * decoder_frame_shift_;
+      lengths_seconds[i] = lengths[i] * decoder_frame_shift_;
     }
     result.push_back(NBestResult{.score = score,
+                                 .ilabels = alignment,
           .words = std::move(words),
-          .times_seconds = std::move(times_seconds)});
+          .word_start_times_seconds = std::move(begin_times_seconds),
+          .word_durations_seconds = std::move(lengths_seconds)});
   }
   return result;
 }
