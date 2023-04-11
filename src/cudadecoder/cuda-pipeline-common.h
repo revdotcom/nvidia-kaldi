@@ -73,7 +73,17 @@ struct NBestResult {
   std::vector<int32> words;
   std::vector<BaseFloat> word_start_times_seconds;
   std::vector<BaseFloat> word_durations_seconds;
+
+  friend bool operator==(const NBestResult&, const NBestResult&);
 };
+
+inline bool operator==(const NBestResult& a, const NBestResult& b) {
+  return a.score == b.score &&
+    a.ilabels == b.ilabels &&
+    a.words == b.words &&
+    a.word_start_times_seconds == b.word_start_times_seconds &&
+    a.word_durations_seconds == b.word_durations_seconds;
+}
 
 // Struct to provide a result back to the user
 class CudaPipelineResult {
