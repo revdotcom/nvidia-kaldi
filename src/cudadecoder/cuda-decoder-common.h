@@ -574,15 +574,13 @@ enum QUEUE_ID { MAIN_Q = 0, AUX_Q = 1 };
 struct PartialPathArc {
   int32 token_idx;
   int32 arc_idx;
-  int32 substring_end;
-  int32 olabel;
+  CostType score;
 
-  PartialPathArc(int32 _token_idx = -1, int32 _arc_idx = -1,
-                 int32 _substring_end = -1)
+  PartialPathArc(int32 _token_idx = -1, int32 _arc_idx = -1)
       : token_idx(_token_idx),
         arc_idx(_arc_idx),
-        substring_end(_substring_end),
-        olabel(-1) {}
+        // how to set score initially?
+        score(-std::numeric_limits<CostType>::infinity()) {}
 };
 
 // Partial hypothesis formatted and meant to be used by user
@@ -590,6 +588,26 @@ struct PartialHypothesis {
   std::string out_str;
 
   void clear() { out_str.clear(); }
+};
+
+// Contains "extras" that PartialHypothesis does not have. Added this
+// instead of replacing PartialHypothesis in order to maintain
+// backwards compatibility.
+struct PartialHypothesisEx {
+  float score;
+  std::vector<int32> ilabels;
+  std::vector<int32> words;
+  // need to have start time of previous olabel...
+  std::vector<int32> word_start_times_frames;
+  std::vector<int32> word_end_times_frames;
+
+  void clear() {
+    score = 0.0;
+    ilabels.clear();
+    words.clear();
+    word_start_times_frames.clear();
+    word_end_times_frames.clear();
+  }
 };
 
 }  // end namespace cuda_decoder

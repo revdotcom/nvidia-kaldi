@@ -294,12 +294,20 @@ class CudaDecoder {
 
   // here's how we get the partial hypotheses... Need to wait until we
   // can do this for thread safety.
-  void GetPartialHypothesis(ChannelId ichannel, PartialHypothesis **out) {
+  // void GetPartialHypothesis(ChannelId ichannel, PartialHypothesis **out) {
+  //   KALDI_ASSERT(generate_partial_hypotheses_);
+  //   WaitForPartialHypotheses();
+  //   // No need to lock, all ops on h_all_channels_partial_hypotheses_out_ are
+  //   // done after calling WaitForPartialHypotheses()
+  //   *out = &h_all_channels_partial_hypotheses_out_[ichannel];
+  // }
+
+  PartialHypothesisEx GetPartialHypothesisEx(ChannelId ichannel) {
     KALDI_ASSERT(generate_partial_hypotheses_);
     WaitForPartialHypotheses();
     // No need to lock, all ops on h_all_channels_partial_hypotheses_out_ are
     // done after calling WaitForPartialHypotheses()
-    *out = &h_all_channels_partial_hypotheses_out_[ichannel];
+    return h_all_channels_partial_hypotheses_out_[ichannel];
   }
 
   bool EndpointDetected(ChannelId ichannel) {
@@ -501,8 +509,7 @@ class CudaDecoder {
   // Used to generate the partial hypotheses
   // Called by the worker threads async
   void BuildPartialHypothesisOutput(
-      ChannelId ichannel,
-      std::stack<std::pair<int, PartialPathArc *>> *traceback_buffer_);
+      ChannelId ichannel);
   void GeneratePartialPath(LaneId ilane, ChannelId ichannel);
 
   void EndpointDetected(LaneId ilane, ChannelId ichannel);
@@ -815,7 +822,7 @@ class CudaDecoder {
 
   // Partial hypotheses to be used by user
   // Only valid between API calls (InitDecoding, AdvanceDecoding)
-  std::vector<PartialHypothesis> h_all_channels_partial_hypotheses_out_;
+  std::vector<PartialHypothesisEx> h_all_channels_partial_hypotheses_out_;
   std::vector<char>
       h_all_channels_endpoint_detected_;  // not using a bool, we need it to be
                                           // threadsafe
