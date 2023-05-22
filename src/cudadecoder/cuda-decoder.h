@@ -364,6 +364,14 @@ class CudaDecoder {
     word_syms_ = &word_syms;
   }
 
+  // Used to generate the partial hypotheses
+  // Called by the worker threads async
+  void BuildPartialHypothesisOutput(
+      ChannelId ichannel);
+  void GeneratePartialPath(ChannelId ichannel);
+  void LaunchPartialHypotheses(const std::vector<int>& channels);
+
+  void EndpointDetected(LaneId ilane, ChannelId ichannel);
  private:
   // Data allocation. Called in constructor
   void AllocateDeviceData();
@@ -506,18 +514,10 @@ class CudaDecoder {
   // This is done by ComputeH2HCopies
   void ComputeH2HCopies();
 
-  // Used to generate the partial hypotheses
-  // Called by the worker threads async
-  void BuildPartialHypothesisOutput(
-      ChannelId ichannel);
-  void GeneratePartialPath(LaneId ilane, ChannelId ichannel);
-
-  void EndpointDetected(LaneId ilane, ChannelId ichannel);
   // Wait for the async partial hypotheses related tasks to be done
   // before returning
   void WaitForPartialHypotheses();
 
-  void LaunchPartialHypotheses();
   // Takes care of preparing the data for ComputeH2HCopies
   // and check whether we can use the threadpool or we have to do the work
   // on the current thread
@@ -828,7 +828,7 @@ class CudaDecoder {
                                           // threadsafe
 
   // Used internally to store the state of the current partial hypotheses
-  std::vector<std::list<PartialPathArc>> h_all_channels_partial_hypotheses_;
+  std::vector<std::vector<PartialPathArc>> h_all_channels_partial_hypotheses_;
 
   // Used when calling GetBestCost
   std::vector<std::pair<int32, CostType>> argmins_;

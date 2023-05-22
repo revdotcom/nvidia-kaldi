@@ -237,6 +237,7 @@ void CudaDecoder::AllocateHostData() {
     h_all_tokens_extra_prev_tokens_extra_and_acoustic_cost_[ichannel].reserve(
         ntokens_pre_allocated_);
     h_all_tokens_acoustic_cost_[ichannel].reserve(ntokens_pre_allocated_);
+    h_all_tokens_extra_prev_tokens_[ichannel].reserve(ntokens_pre_allocated_);
     h_all_tokens_info_[ichannel].reserve(ntokens_pre_allocated_);
   }
   h_main_q_end_lane_offsets_.resize(nlanes_ + 1);
@@ -728,6 +729,7 @@ void CudaDecoder::CopyMainQueueDataToHost() {
         h_lanes_counters_.lane(ilane)->main_q_end_lane_offset;
     h_n_extra_prev_tokens_lane_offsets_[ilane] =
         h_lanes_counters_.lane(ilane)->main_q_n_extra_prev_tokens_lane_offset;
+    // why would this not be true?
     if (ilane < nlanes_used_) {
       lanes2channels_todo_.push_back(channel_to_compute_[ilane]);
       int32 global_offset = h_lanes_counters_.lane(ilane)->main_q_global_offset;
@@ -738,10 +740,16 @@ void CudaDecoder::CopyMainQueueDataToHost() {
       h_best_path_traceback_head_[ilane].relative_cost = relative_cost;
       const ChannelId ichannel = channel_to_compute_[ilane];
       ++num_frames_decoded_[ichannel];
+      h_all_channels_prev_best_path_traceback_head_[ichannel] =
+        h_best_path_traceback_head_[ilane];
     }
   }
   LaunchH2HCopies();
-  LaunchPartialHypotheses();
+  // NOTE: We used to call LaunchPartialHypotheses() at the end of
+  // every AdvanceDecoding() call, but this has no real benefit
+  // compared to simply doing it at the end of the final
+  // AdvanceDecoding() call.
+  // LaunchPartialHypotheses();
   nvtxRangePop();
 }
 
@@ -1638,11 +1646,6 @@ void CudaDecoder::ConcurrentGetRawLatticeSingleChannel(const ChannelId ichannel,
   TokenId best_cost_idx;
   {
     std::lock_guard<std::mutex> channel_lk(channel_lock_[ichannel]);
-    h_all_tokens_info_[ichannel].shrink_to_fit();
-    h_all_tokens_acoustic_cost_[ichannel].shrink_to_fit();
-    h_all_tokens_extra_prev_tokens_[ichannel].shrink_to_fit();
-    h_all_tokens_extra_prev_tokens_extra_and_acoustic_cost_[ichannel]
-        .shrink_to_fit();
     best_cost_idx = h_all_argmin_cost_[ichannel].first;
   }
   fst_out->DeleteStates();  // reset out lattice
@@ -1848,9 +1851,9 @@ void CudaDecoder::CheckStaticAsserts() {
   KALDI_COMPILE_TIME_ASSERT(KALDI_CUDA_DECODER_NONEM_LT_MAX_NARCS > 0);
 }
 
-void CudaDecoder::LaunchPartialHypotheses() {
+void CudaDecoder::LaunchPartialHypotheses(const std::vector<int>& channels) {
   if (partial_traceback_) {
-    auto nlanes_used = nlanes_used_;
+    auto nlanes_used = channels.size();  // nlanes_used_;
     const size_t num_tasks = thread_pool_->num_workers();
 
     {
@@ -1859,7 +1862,7 @@ void CudaDecoder::LaunchPartialHypotheses() {
       n_partial_traceback_threads_not_done_ = thread_pool_ ? num_tasks : 1;
     }
 
-    auto launch = [this, nlanes_used, num_tasks]() {
+    auto launch = [this, nlanes_used, num_tasks, channels]() {
       WaitForInitDecodingH2HCopies();
       WaitForH2HCopies();
 
@@ -1867,20 +1870,23 @@ void CudaDecoder::LaunchPartialHypotheses() {
       KALDI_CUDA_DECODER_DIV_ROUND_UP(nlanes_used,
                                       num_tasks);
       for (size_t i = 0; i < num_tasks; i += 1) {
-        auto task = [this, nlanes_used, batch_size, i, num_tasks]() {
+        auto task = [this, nlanes_used, batch_size, i, num_tasks, channels]() {
           for (size_t ilane = i * batch_size;
                ilane < std::min(size_t((i + 1) * batch_size), size_t(nlanes_used));
                ++ilane) {
-            int32 ichannel = lanes2channels_todo_[ilane];
-            h_all_channels_prev_best_path_traceback_head_[ichannel] =
-              h_best_path_traceback_head_[ilane];
-            GeneratePartialPath(ilane, ichannel);
+            int32 ichannel = channels[ilane];
+            nvtxRangePush("GeneratePartialPath");
+            GeneratePartialPath(ichannel);
+            nvtxRangePop();
             if (generate_partial_hypotheses_) {
+              nvtxRangePush("BuildPartialHypothesisOutput");
               BuildPartialHypothesisOutput(ichannel);
+              nvtxRangePop();
             }
-            if (endpointing_) {
-              EndpointDetected(ilane, ichannel);
-            }
+            // TODO: Reconsider how this works.
+            // if (endpointing_) {
+            //   EndpointDetected(ilane, ichannel);
+            // }
           }
           {
             std::lock_guard<std::mutex> lk(n_partial_traceback_threads_not_done_mutex_);
@@ -1934,88 +1940,28 @@ void CudaDecoder::ComputeH2HCopiesCPUWorker() {
   }
 }
 
-void CudaDecoder::GeneratePartialPath(LaneId ilane, ChannelId ichannel) {
-  // Partial hypothesis
-  // We use the (n-1) frame head
+void CudaDecoder::GeneratePartialPath(ChannelId ichannel) {
   auto prev_best_path_traceback_head =
       h_all_channels_prev_best_path_traceback_head_[ichannel];
   KALDI_ASSERT(prev_best_path_traceback_head.IsSet());
   int curr_token_idx = prev_best_path_traceback_head.index;
-  if (curr_token_idx > 0) {
-    // Locking, we need the host channel data to use GetBestPredecessor
-    std::lock_guard<std::mutex> channel_lk(channel_lock_[ichannel]);
 
+  // not sure about this lock...
+  std::lock_guard<std::mutex> channel_lk(channel_lock_[ichannel]);
+  std::vector<PartialPathArc> &partial_hypotheses =
+    h_all_channels_partial_hypotheses_[ichannel];
+  partial_hypotheses.clear();
+  // can there be more tokens than frames decoded?
+  // partial_hypotheses.reserve(num_frames_decoded_[ichannel]);
+  while (curr_token_idx > 0) {
     int prev_token_idx;
     int arc_idx;
     GetBestPredecessor(ichannel, curr_token_idx, &prev_token_idx, &arc_idx);
 
-    // TODO: consider using std::deque
-    std::list<PartialPathArc> &partial_hypotheses =
-        h_all_channels_partial_hypotheses_[ichannel];
-
-    // Adding that link at the end of the partial path
-    partial_hypotheses.emplace_back(curr_token_idx, arc_idx);
-    // If this is the first link, we don't have to check that we're still on the
-    // same best path as before
-    // float total_cost_including_final = orderedIntToFloatHost(h_channels_counters_[ichannel].min_int_cost_and_arg_with_final.x);
-    // partial_hypotheses.back().score = total_cost_including_final;
-    float acoustic_cost = h_all_tokens_acoustic_cost_[ichannel][curr_token_idx];
-    float graph_cost = fst_.h_arc_weights_[arc_idx];
-    if (partial_hypotheses.size() == 1) {
-      // is this one correct? Unsure...
-      // need to add final score here somehow...
-      // sigh, the best token is not necessarily using final costs...
-      // float final_cost = fst_.h_final_[fst_.h_arc_nextstate_[arc_idx]];
-      // if (final_cost == std::numeric_limits<float>::infinity()) {
-      //   final_cost = 0.0f;
-      // }
-      // float total_cost_including_final = orderedIntToFloatHost(h_channels_counters_[ichannel].min_int_cost_and_arg_with_final.x);
-      partial_hypotheses.back().score = acoustic_cost + graph_cost;  // + final_cost;
-      return;
-    } else {
-      const PartialPathArc& second_to_last = *std::prev(partial_hypotheses.end(), 2);
-      partial_hypotheses.back().score = acoustic_cost + graph_cost + second_to_last.score;
-    }
-
-    // Backtracking until we reconnect with our stored partial path
-    // using prev(2):
-    // 1. last valid element, the one we've just added
-    // 2. the one before that, the one we need to check
-    // start with second-to-last element
-    auto it = std::prev(partial_hypotheses.end(), 2);
-
-    // The new partial best path is not directly to the previous partial
-    // best path. We need to backtrack until we reconnect with the previous
-    // partial best path (or until we reach the root node)
-
-    while (true) {
-      int32 stored_prev_token_idx = it->token_idx;
-      // the paths have conjoined here
-      if (stored_prev_token_idx == prev_token_idx)
-        break;  // no need to rewrite existing partial path
-      curr_token_idx = prev_token_idx;
-      GetBestPredecessor(ichannel, curr_token_idx, &prev_token_idx, &arc_idx);
-      it->token_idx = curr_token_idx;
-      it->arc_idx = arc_idx;
-      float previous_score = 0.0;
-      float acoustic_cost = h_all_tokens_acoustic_cost_[ichannel][curr_token_idx];
-      float graph_cost = fst_.h_arc_weights_[arc_idx];
-      it->score = acoustic_cost + graph_cost + previous_score;
-
-      if (prev_token_idx == 0) break;
-      if (it == partial_hypotheses.begin()) {
-        // Our new path is longer than the previous one
-        // Adding some elts
-        partial_hypotheses.emplace_front();  // default for now, it will be set
-                                             // on next iteration
-      }
-      --it;
-    }
-
-    if (prev_token_idx == 0) {
-      // We've reached the beginning, we need to purge any elts
-      partial_hypotheses.erase(partial_hypotheses.begin(), it);
-    }
+    partial_hypotheses.emplace_back(prev_token_idx, arc_idx);
+    // TODO: need to set the score here... By default, it is set to negative infinity. Unfortunately, the data we copy back to host right now does not include the full "score" of a token...
+    // partial_hypotheses.back().score = h_all_tokens_acoustic_cost_[ichannel][curr_token_idx] + fst_.h_arc_weights_[arc_idx] + score of parent token;
+    curr_token_idx = prev_token_idx;
   }
 }
 
@@ -2027,22 +1973,18 @@ void CudaDecoder::BuildPartialHypothesisOutput(
   std::vector<int> traceback_end_times;
   // reads h_all_channels_partial_hypotheses_, writes h_all_channels_partial_hypotheses_out_
   // We assume that we own the channel lock
-  const std::list<PartialPathArc> &partial_hypotheses_internal =
+  const std::vector<PartialPathArc> &partial_hypotheses_internal =
       h_all_channels_partial_hypotheses_[ichannel];
 
   size_t total_frames = 0;
-  // we're going backwards to compute this...
   for (auto link = partial_hypotheses_internal.rbegin();
        link != partial_hypotheses_internal.rend(); ++link) {
     int arc_idx = link->arc_idx;
     int olabel = fst_.h_arc_olabels_[arc_idx];
     int ilabel = fst_.h_arc_id_ilabels_[arc_idx];
     if (olabel != 0) {
-      // kind of funky. How do I get the duration of all phonemes
-      // associated with this word?
       traceback_olabels.push_back(olabel);
       traceback_start_times.push_back(total_frames);
-      traceback_end_times.push_back(total_frames + 1);
     }
     if (ilabel != 0) {
       traceback_ilabels.push_back(ilabel);
@@ -2050,16 +1992,12 @@ void CudaDecoder::BuildPartialHypothesisOutput(
     }
   }
 
-  KALDI_ASSERT(traceback_start_times.size() == traceback_end_times.size());
-  for (std::size_t i = 0; i < traceback_start_times.size(); ++i) {
-    traceback_start_times[i] = total_frames - traceback_start_times[i];
-    traceback_end_times[i] = total_frames - traceback_end_times[i];
-  }
+  std::copy(std::next(traceback_start_times.begin()),
+            traceback_start_times.end(),
+            std::back_inserter(traceback_end_times));
 
-  std::reverse(traceback_ilabels.begin(), traceback_ilabels.end());
-  std::reverse(traceback_olabels.begin(), traceback_olabels.end());
-  std::reverse(traceback_start_times.begin(), traceback_start_times.end());
-  std::reverse(traceback_end_times.begin(), traceback_end_times.end());
+  traceback_end_times.push_back(total_frames);
+  
 
   PartialHypothesisEx &out = h_all_channels_partial_hypotheses_out_[ichannel];
   out.score = partial_hypotheses_internal.rbegin()->score;
@@ -2070,40 +2008,41 @@ void CudaDecoder::BuildPartialHypothesisOutput(
 }
 
 void CudaDecoder::EndpointDetected(LaneId ilane, ChannelId ichannel) {
-  // We use the (n-1) frame head
-  auto prev_best_path_traceback_head =
-      h_all_channels_prev_best_path_traceback_head_[ichannel];
-  if (!prev_best_path_traceback_head.IsSet()) return;  // nothing to do
+  KALDI_ASSERT(false && "Endpointing is not implemented right now.");
+  // // We use the (n-1) frame head
+  // auto prev_best_path_traceback_head =
+  //     h_all_channels_prev_best_path_traceback_head_[ichannel];
+  // if (!prev_best_path_traceback_head.IsSet()) return;  // nothing to do
 
-  CostType relative_cost = prev_best_path_traceback_head.relative_cost;
+  // CostType relative_cost = prev_best_path_traceback_head.relative_cost;
 
-  int num_frames_decoded =
-      num_frames_decoded_[ichannel] - 1;  // we use the n-1 frame head
+  // int num_frames_decoded =
+  //     num_frames_decoded_[ichannel] - 1;  // we use the n-1 frame head
 
-  // Count silence frames
-  std::list<PartialPathArc> &partial_hypotheses_internal =
-      h_all_channels_partial_hypotheses_[ichannel];
-  int num_silence_frames = 0;
-  for (auto it = partial_hypotheses_internal.rbegin();
-       it != partial_hypotheses_internal.rend(); ++it) {
-    int arc_idx = it->arc_idx;
-    int ilabel = fst_.h_arc_id_ilabels_[arc_idx];
-    // If not a silence phone, exit
-    // we could cache this boolean
-    if (silence_phones_.find(ilabel) == silence_phones_.end()) break;
-    ++num_silence_frames;
-  }
-  bool end_point = kaldi::EndpointDetected(
-      config_.endpointing_config, num_frames_decoded, num_silence_frames,
-      frame_shift_seconds_, relative_cost);
+  // // Count silence frames
+  // std::deque<PartialPathArc> &partial_hypotheses_internal =
+  //     h_all_channels_partial_hypotheses_[ichannel];
+  // int num_silence_frames = 0;
+  // for (auto it = partial_hypotheses_internal.rbegin();
+  //      it != partial_hypotheses_internal.rend(); ++it) {
+  //   int arc_idx = it->arc_idx;
+  //   int ilabel = fst_.h_arc_id_ilabels_[arc_idx];
+  //   // If not a silence phone, exit
+  //   // we could cache this boolean
+  //   if (silence_phones_.find(ilabel) == silence_phones_.end()) break;
+  //   ++num_silence_frames;
+  // }
+  // // how is relative_cost used here?
+  // bool end_point = kaldi::EndpointDetected(
+  //     config_.endpointing_config, num_frames_decoded, num_silence_frames,
+  //     frame_shift_seconds_, relative_cost);
 
-  h_all_channels_endpoint_detected_[ichannel] = end_point;
+  // h_all_channels_endpoint_detected_[ichannel] = end_point;
 }
 
 void CudaDecoder::ComputeH2HCopies() {
   // Waiting for either something to do or the instruction to stop the
   // threads
-  nvtxRangePush("ComputeH2HCopies");
   {
     std::unique_lock<std::mutex> n_h2h_lk(n_h2h_main_task_todo_mutex_);
     n_h2h_main_task_todo_cv_.wait(n_h2h_lk, [this] {
@@ -2115,14 +2054,17 @@ void CudaDecoder::ComputeH2HCopies() {
   // ComputeH2HCopiesCPUWorker will also return, stopping the thread
   if (!h2h_threads_running_) return;
 
+  nvtxRangePush("ComputeH2HCopies");
   int32 ilane;
   // Waiting for the D2H copies. This is threadsafe
   // Step 1: acoustic costs
+  nvtxRangePush("acoustic costs");
   CU_SAFE_CALL(cudaEventSynchronize(d2h_copy_acoustic_evt_));
   while ((ilane = n_acoustic_h2h_copies_todo_.fetch_sub(1)) >= 0) {
     int32 ichannel = lanes2channels_todo_[ilane];
     // Lock Channel
     std::lock_guard<std::mutex> channel_lk(channel_lock_[ichannel]);
+    size_t old_capacity = h_all_tokens_acoustic_cost_[ichannel].capacity();
     MoveConcatenatedCopyToVector(
         ilane, ichannel, h_emitting_main_q_end_lane_offsets_,
         h_acoustic_cost_concat_, &h_all_tokens_acoustic_cost_);
@@ -2134,32 +2076,61 @@ void CudaDecoder::ComputeH2HCopies() {
     int32 ntokens_nonemitting = main_q_end - ntokens_emitting;
     auto &vec = h_all_tokens_acoustic_cost_[ichannel];
     vec.insert(vec.end(), ntokens_nonemitting, 0.0f);
+    if (h_all_tokens_acoustic_cost_[ichannel].capacity() > old_capacity) {
+      KALDI_WARN << "Resized host vector containing 'acoustic costs'. This can cause latency spikes in production. Please use smaller input audio sequences or increase ntokens_pre_allocated"
+                 << "Old capacity: " << old_capacity << ", New capacity:" << h_all_tokens_acoustic_cost_[ichannel].capacity();
+      nvtxMark("Resizing acoustic costs");
+    }
   }
+  nvtxRangePop();
   // Step 2: infotoken
+  nvtxRangePush("infotoken");
   CU_SAFE_CALL(cudaEventSynchronize(d2h_copy_infotoken_evt_));
   while ((ilane = n_infotoken_h2h_copies_todo_.fetch_sub(1)) >= 0) {
     int32 ichannel = lanes2channels_todo_[ilane];
     // Lock Channel
     std::lock_guard<std::mutex> channel_lk(channel_lock_[ichannel]);
+    size_t old_capacity = h_all_tokens_info_[ichannel].capacity();
     MoveConcatenatedCopyToVector(ilane, ichannel, h_main_q_end_lane_offsets_,
                                  h_infotoken_concat_, &h_all_tokens_info_);
+    if (h_all_tokens_info_[ichannel].capacity() > old_capacity) {
+      KALDI_WARN << "Resized host vector containing 'infotoken'. This can cause latency spikes in production. Please use smaller input audio sequences or increase ntokens_pre_allocated"
+                 << "Old capacity: " << old_capacity << ", New capacity:" << h_all_tokens_info_[ichannel].capacity();
+      nvtxMark("Resizing infotoken");
+    }
   }
+  nvtxRangePop();
   // Step 3:
   // - extra prev tokens
   // - partial path and endpointing
+  nvtxRangePush("extra prev");
   CU_SAFE_CALL(cudaEventSynchronize(d2h_copy_extra_prev_tokens_evt_));
   while ((ilane = n_extra_prev_tokens_h2h_copies_todo_.fetch_sub(1)) >= 0) {
     int32 ichannel = lanes2channels_todo_[ilane];
     // Lock Channel
     std::lock_guard<std::mutex> channel_lk(channel_lock_[ichannel]);
+    size_t old_capacity = h_all_tokens_extra_prev_tokens_[ichannel].capacity();
     MoveConcatenatedCopyToVector(
         ilane, ichannel, h_n_extra_prev_tokens_lane_offsets_,
         h_extra_prev_tokens_concat_, &h_all_tokens_extra_prev_tokens_);
+    if (h_all_tokens_extra_prev_tokens_[ichannel].capacity() > old_capacity) {
+      KALDI_WARN << "Resized host vector containing 'infotoken'. This can cause latency spikes in production. Please use smaller input audio sequences or increase ntokens_pre_allocated"
+                 << "Old capacity: " << old_capacity << ", New capacity:" << h_all_tokens_extra_prev_tokens_[ichannel].capacity();
+      nvtxMark("Resizing extra prev");
+    }
+
+    old_capacity = h_all_tokens_extra_prev_tokens_extra_and_acoustic_cost_[ichannel].capacity();
     MoveConcatenatedCopyToVector(
         ilane, ichannel, h_n_extra_prev_tokens_lane_offsets_,
         h_extra_and_acoustic_cost_concat_,
         &h_all_tokens_extra_prev_tokens_extra_and_acoustic_cost_);
+    if (h_all_tokens_extra_prev_tokens_extra_and_acoustic_cost_[ichannel].capacity() > old_capacity) {
+      KALDI_WARN << "Resized host vector containing 'extra_prev_tokens_extra_and_acoustic_cost'. This can cause latency spikes in production. Please use smaller input audio sequences or increase ntokens_pre_allocated"
+                 << "Old capacity: " << old_capacity << ", New capacity:" << h_all_tokens_extra_prev_tokens_extra_and_acoustic_cost_[ichannel].capacity();;
+      nvtxMark("Resizing extra prev 2");
+    }
   }
+  nvtxRangePop();
   // If we're the last cpu thread to complete the current tasks, notify
   // the main thread
   bool all_done;
