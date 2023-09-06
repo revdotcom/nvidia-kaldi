@@ -1013,7 +1013,7 @@ __launch_bounds__(KALDI_CUDA_DECODER_LARGEST_1D_BLOCK, 1) __global__
                                     .channel(ichannel)[main_q_idx]
                                     .y);
           total_int_cost = floatToOrderedInt(arc_weight + prev_token_cost);
-	  if(total_int_cost < lane_counters->min_int_cost)
+          if(total_int_cost < lane_counters->min_int_cost)
             atomicMin(&lane_counters->min_int_cost, total_int_cost);
           if (total_int_cost >= int_cutoff) {
             total_int_cost = INT_MAX;  // above cutoff
@@ -1641,7 +1641,7 @@ __global__ void emitting_preprocess_and_list_extra_prev_tokens_step2_kernel(
   typedef cub::BlockScan<int2, KALDI_CUDA_DECODER_1D_BLOCK> BlockScan;
   __shared__ typename BlockScan::TempStorage sh_temp_storage;
   const int nlanes = params.nlanes_used;
-  KALDI_CUDA_DECODER_BATCH_KERNEL_LOOP(ilane, nlanes) {
+  for (int ilane = blockIdx.y; ilane < nlanes; ilane += gridDim.y) {
     LaneCounters *lane_counters = cst_dev_params.d_lanes_counters.lane(ilane);
     const int main_q_end = lane_counters->main_q_narcs_and_end.y;
     const int ntiles = KALDI_CUDA_DECODER_DIV_ROUND_UP(
@@ -1649,7 +1649,9 @@ __global__ void emitting_preprocess_and_list_extra_prev_tokens_step2_kernel(
     // Using block_offset loop to keep entire CTA alive (we're going to use
     // __syncthreads in CUB)
     int2 sum_so_far = {0, 0};
-    KALDI_CUDA_DECODER_1D_BLOCK_OFFSET_KERNEL_LOOP(offset, thread_idx, ntiles) {
+
+    for (int offset = 0, thread_idx = threadIdx.x; offset < ntiles;
+         offset += blockDim.x) {
       const int32 itile = offset + thread_idx;
       const int2 zeroi2 = {0, 0};
       const int2 val =

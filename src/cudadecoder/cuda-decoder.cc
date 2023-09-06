@@ -677,7 +677,7 @@ void CudaDecoder::PostProcessingMainQueue() {
       compute_st_, *h_device_params_, *h_kernel_params_);
 
   EmittingPreprocessAndListExtraPrevTokensStep2Kernel(
-      KaldiCudaDecoderNumBlocks(nlanes_used_), KALDI_CUDA_DECODER_1D_BLOCK,
+      KaldiCudaDecoderNumBlocks(1, nlanes_used_), KALDI_CUDA_DECODER_1D_BLOCK,
       compute_st_, *h_device_params_, *h_kernel_params_);
 
   // Step2 wrote main_q_n_extra_prev_tokens
@@ -1113,6 +1113,7 @@ void CudaDecoder::GetBestPredecessor(int32 ichannel, int32 curr_token_idx,
     // If we have only one, it is an arc with
     // extra_cost == 0
     arc_idx = token.arc_idx;
+    KALDI_ASSERT(arc_idx >= 0 && "Negative arc index");
     prev_token_idx = token.prev_token;
   } else {
     // Using the first arc with extra_cost == 0
@@ -1139,6 +1140,7 @@ void CudaDecoder::GetBestPredecessor(int32 ichannel, int32 curr_token_idx,
         InfoToken list_token =
             h_all_tokens_extra_prev_tokens_[ichannel][offset + i];
         arc_idx = list_token.arc_idx;
+        KALDI_ASSERT(arc_idx >= 0 && "Negative arc index");
         prev_token_idx = list_token.prev_token;
         found_best = true;
         break;
@@ -1957,6 +1959,7 @@ void CudaDecoder::GeneratePartialPath(ChannelId ichannel) {
     int prev_token_idx;
     int arc_idx;
     GetBestPredecessor(ichannel, curr_token_idx, &prev_token_idx, &arc_idx);
+    KALDI_ASSERT(arc_idx >= 0 && "Negative arc index");
 
     partial_hypotheses.emplace_back(prev_token_idx, arc_idx);
     // TODO: need to set the score here... By default, it is set to negative infinity. Unfortunately, the data we copy back to host right now does not include the full "score" of a token...
