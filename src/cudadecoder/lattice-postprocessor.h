@@ -90,7 +90,7 @@ class LatticePostprocessor {
   LatticePostprocessor(const LatticePostprocessorConfig &config);
   void ApplyConfig();
   bool GetCTM(CompactLattice &clat, CTMResult *ctm_result) const;
-  bool GetPostprocessedLattice(CompactLattice &clat,
+  bool GetPostprocessedLattice(const CompactLattice &clat_const,
                                CompactLattice *out_clat) const;
   std::vector<NBestResult> GetNBestList(CompactLattice &clat) const;
 

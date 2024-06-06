@@ -53,12 +53,13 @@ void LatticePostprocessor::ApplyConfig() {
 }
 
 bool LatticePostprocessor::GetPostprocessedLattice(
-    CompactLattice &clat, CompactLattice *out_clat) const {
+    const CompactLattice &clat_const, CompactLattice *out_clat) const {
   // Nothing to do for empty lattice
   if (clat.NumStates() == 0) return true;
 
   bool ok = true;
   // Scale lattice
+  CompactLattice clat = clat_const;
   if (use_lattice_scale_) fst::ScaleLattice(lattice_scales_, &clat);
 
   // Word insertion penalty
