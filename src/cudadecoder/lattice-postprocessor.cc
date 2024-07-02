@@ -55,7 +55,7 @@ void LatticePostprocessor::ApplyConfig() {
 bool LatticePostprocessor::GetPostprocessedLattice(
     const CompactLattice &clat_const, CompactLattice *out_clat) const {
   // Nothing to do for empty lattice
-  if (clat.NumStates() == 0) return true;
+  if (clat_const.NumStates() == 0) return true;
 
   bool ok = true;
   // Scale lattice
