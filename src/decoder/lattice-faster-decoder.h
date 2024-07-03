@@ -49,6 +49,7 @@ struct LatticeFasterDecoderConfig {
   // a very important parameter.  It affects the algorithm that prunes the
   // tokens as we go.
   BaseFloat prune_scale;
+  BaseFloat length_penalty;
 
   // Most of the options inside det_opts are not actually queried by the
   // LatticeFasterDecoder class itself, but by the code that calls it, for
@@ -63,7 +64,8 @@ struct LatticeFasterDecoderConfig {
                                 determinize_lattice(true),
                                 beam_delta(0.5),
                                 hash_ratio(2.0),
-                                prune_scale(0.1) { }
+                                prune_scale(0.1),
+                                length_penalty(0.0) { }
   void Register(OptionsItf *opts) {
     det_opts.Register(opts);
     opts->Register("beam", &beam, "Decoding beam.  Larger->slower, more accurate.");
